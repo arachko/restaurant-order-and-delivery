@@ -2,10 +2,20 @@
   "version": "2.0",
   "app_name": "restaurant-menu-and-order",
   "stages": {
+    "localdev": {
+      "autogen_policy": false,
+      "api_gateway_stage": "api",
+      "environment_variables": {
+        "DEFAULT_REGION": "eu-central-1",
+        "ENDPOINT_URL": "http://localhost:9000",
+        "GEN_TABLE_NAME": "local",
+        "BUCKET_FOR_CONTAINER_FILES": "rmd-containers"
+      }
+    },
     "dev": {
       "api_gateway_stage": "api",
       "environment_variables": {
-        "GEN_TABLE_NAME": "menu-order-gen-dev"
+        "GEN_TABLE_NAME": "rmd-gen-dev"
       }
     }
   }
