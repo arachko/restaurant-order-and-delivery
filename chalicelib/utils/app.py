@@ -3,7 +3,7 @@ from typing import Callable
 
 from chalice import Response
 
-from chalicelib.utils.exceptions import MandatoryFieldsAreNotFilled
+from chalicelib.utils.exceptions import MandatoryFieldsAreNotFilled, OrderNotFound
 from chalicelib.utils.logger import logger, log_exception
 
 
@@ -32,6 +32,11 @@ def request_exception_handler(func: Callable):
             return error_response(
                 error=mandatory_error,
                 msg=f'function = {func.__name__} , error = {mandatory_error}',
+                status_code=400)
+        except OrderNotFound as order_not_found:
+            return error_response(
+                error=order_not_found,
+                msg=f'function = {func.__name__} , error = {order_not_found}',
                 status_code=400)
         except Exception as exception:
             return error_response(

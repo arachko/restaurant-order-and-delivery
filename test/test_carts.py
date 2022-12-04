@@ -14,7 +14,9 @@ token_admin = 'admin'
 token_restaurant_manager = 'restaurant_manager'
 token_user = 'user'
 
-test_user_id = '13303309-d941-486f-b600-3e90929ac50f'
+id_admin = '13303309-d941-486f-b600-3e90929ac50f'
+id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
+id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
 
 
 def create_test_restaurant(chalice_gateway):
@@ -27,7 +29,7 @@ def create_test_restaurant(chalice_gateway):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
     id_ = json.loads(response["body"])["id"]
     pk = keys_structure.restaurants_pk
     sk = keys_structure.restaurants_sk.format(restaurant_id=id_)
@@ -42,7 +44,7 @@ def create_test_menu_item(chalice_gateway, restaurant_id):
         'price': 130
     }
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="POST",
-                            json_body=menu_item_to_create, token=token_restaurant_manager)
+                            json_body=menu_item_to_create, token=id_restaurant_manager)
 
     id_ = json.loads(response["body"])["id"]
     pk = keys_structure.menu_items_pk.format(restaurant_id=restaurant_id)
@@ -52,12 +54,12 @@ def create_test_menu_item(chalice_gateway, restaurant_id):
 
 @pytest.mark.local_db_test
 def test_get_cart(chalice_gateway, request):
-    response = make_request(chalice_gateway, endpoint=f"/carts", method="GET")
+    response = make_request(chalice_gateway, endpoint=f"/carts", method="GET", token=id_user)
 
     response_body = json.loads(response["body"]).get('cart')
 
     assert response['statusCode'] == http200, f"status code not as expected"
-    assert response_body['user_id'] == test_user_id
+    assert response_body['user_id'] == id_user
     assert response_body['restaurant_id'] is None
     assert response_body['delivery_address'] is None
     assert response_body['delivery_price'] is None
@@ -69,10 +71,10 @@ def test_add_item_to_cart(chalice_gateway, request):
     restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
     menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=test_user_id)
+    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
 
     response = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}/{menu_item_id}", method="POST",
-                            json_body={'address': 'test_address'}, token=token_user)
+                            json_body={'address': 'test_address'}, token=id_user)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
@@ -83,7 +85,7 @@ def test_add_item_to_cart(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     def assert_cart_details(assert_dict, from_db=False):
-        assert assert_dict['user_id'] == test_user_id
+        assert assert_dict['user_id'] == id_user
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['delivery_address'] == 'test_address'
         assert assert_dict['delivery_price'] == 0.0
@@ -98,7 +100,7 @@ def test_add_item_to_cart(chalice_gateway, request):
     db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record, from_db=True)
 
-    response_get = make_request(chalice_gateway, endpoint=f"/carts", method="GET")
+    response_get = make_request(chalice_gateway, endpoint=f"/carts", method="GET", token=id_user)
     cart = json.loads(response_get["body"]).get('cart')
     assert_cart_details(cart)
 
@@ -108,10 +110,10 @@ def test_remove_item_from_cart(chalice_gateway, request):
     restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
     menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=test_user_id)
+    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
 
     response = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}/{menu_item_id}", method="POST",
-                            json_body={'address': 'test_address'}, token=token_user)
+                            json_body={'address': 'test_address'}, token=id_user)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
@@ -124,7 +126,7 @@ def test_remove_item_from_cart(chalice_gateway, request):
     def assert_cart_details(assert_dict, from_db=False, items=None):
         if items is None:
             items = [menu_item_id]
-        assert assert_dict['user_id'] == test_user_id
+        assert assert_dict['user_id'] == id_user
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['delivery_address'] == 'test_address'
         assert assert_dict['delivery_price'] == 0.0
@@ -136,7 +138,7 @@ def test_remove_item_from_cart(chalice_gateway, request):
     db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record, from_db=True)
 
-    response_get = make_request(chalice_gateway, endpoint=f"/carts/{menu_item_id}", method="DELETE")
+    response_get = make_request(chalice_gateway, endpoint=f"/carts/{menu_item_id}", method="DELETE", token=id_user)
     cart = json.loads(response_get["body"]).get('cart')
     assert_cart_details(cart, items=[])
 
@@ -149,10 +151,10 @@ def test_clear_cart(chalice_gateway, request):
     restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
     menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=test_user_id)
+    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
 
     response = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}/{menu_item_id}", method="POST",
-                            json_body={'address': 'test_address'}, token=token_user)
+                            json_body={'address': 'test_address'}, token=id_user)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
@@ -163,7 +165,7 @@ def test_clear_cart(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     def assert_cart_details(assert_dict):
-        assert assert_dict['user_id'] == test_user_id
+        assert assert_dict['user_id'] == id_user
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['delivery_address'] == 'test_address'
         assert assert_dict['delivery_price'] == 0.0
@@ -172,7 +174,7 @@ def test_clear_cart(chalice_gateway, request):
     db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record)
 
-    response_get = make_request(chalice_gateway, endpoint=f"/carts", method="DELETE")
+    response_get = make_request(chalice_gateway, endpoint=f"/carts", method="DELETE", token=id_user)
     assert json.loads(response_get["body"]).get('message') == 'Cart was successfully cleared'
 
     get_db_record_response = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})

@@ -1,16 +1,14 @@
 USER = {
     'id_': None,
     'first_name': None,
-    'middle_name': None,
     'last_name': None,
     'email': None,
     'phone': None,
     'addresses': None,
-    'alt_email': None,
-    'alt_phone': None,
+    'additional_phone_numbers': None,
+    'role': None,
     'date_created': None,
-    'date_updated': None,
-    'authorization_type': None
+    'date_updated': None
 }
 
 RESTAURANT = {

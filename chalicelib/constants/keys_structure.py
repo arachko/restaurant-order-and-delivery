@@ -20,7 +20,7 @@ orders_archived_pk = 'orders_archived_{restaurant_id}'
 orders_archived_sk = '{user_id}_{order_id}'
 
 gsi_user_orders_pk = 'orders_{user_id}'
-gsi_user_orders_sk = '{order_id}'
+gsi_user_orders_sk = '{restaurant_id}_{order_id}'
 
 gsi_orders_archived_pk = 'orders_archived_{user_id}'
 gsi_orders_archived_sk = '{restaurant_id}_{order_id}'

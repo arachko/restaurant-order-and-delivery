@@ -65,7 +65,7 @@ class PreOrder:
         request_body = utils_data.parse_raw_body(request)
         substitute_keys(request_body, to_db)
         return cls(
-            id_=str(uuid4()),
+            id_=str(uuid4()).split('-')[0],
             user_id=UNAUTHORIZED_USER,
             **request_body
         )
@@ -224,15 +224,6 @@ class Order:
         c.init_by_pre_order()
         return c
 
-    @classmethod
-    def init_request_get_by_id_unauthorized_user(cls, request, order_id):
-        logger.info("init_request_get_by_it_unauthorized_user ::: started")
-        user_id = UNAUTHORIZED_USER
-        id_ = order_id
-        c = cls(id_, user_id)
-        c.__init__(**c._get_db_item_by_user_gsi())
-        return c
-
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_create_order_unauthorized_user(self):
@@ -243,6 +234,7 @@ class Order:
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_get_by_id_unauthorized_user(self):
+        self.__init__(**self._get_db_item_by_user_gsi())
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
         return Response(status_code=http200, body=self.to_ui())
 
@@ -256,7 +248,8 @@ class Order:
         return self.pk.format(restaurant_id=self.restaurant_id), self.sk.format(user_id=self.user_id, order_id=self.id_)
 
     def _get_pk_sk_user_gsi(self) -> Tuple[str, str]:
-        return self.pk_gsi_user_orders.format(user_id=self.user_id), self.sk_gsi_user_orders.format(order_id=self.id_)
+        return self.pk_gsi_user_orders.format(user_id=self.user_id), \
+               self.sk_gsi_user_orders.format(restaurant_id=self.restaurant_id, order_id=self.id_)
 
     def _get_db_item_by_user_gsi(self):
         pk_gsi_user_orders, sk_gsi_user_orders = self._get_pk_sk_user_gsi()

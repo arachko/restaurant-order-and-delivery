@@ -1,5 +1,6 @@
 __all__ = ["NotAuthorizedException", "AccessDenied", "RecordNotFound", "NumberOfRetriesExceeded",
-           "MandatoryFieldsAreNotFilled", "WrongDeliveryAddress", "SomeItemsAreNotAvailable", "OrderNotFound"]
+           "MandatoryFieldsAreNotFilled", "WrongDeliveryAddress", "SomeItemsAreNotAvailable", "OrderNotFound",
+           "AuthorizationException"]
 
 
 class NotAuthorizedException(Exception):

@@ -13,6 +13,10 @@ token_admin = 'admin'
 token_user = 'user'
 token_restaurant_manager = 'restaurant_manager'
 
+id_admin = '13303309-d941-486f-b600-3e90929ac50f'
+id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
+id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
+
 
 @pytest.mark.local_db_test
 def test_create_restaurant(chalice_gateway, request):
@@ -25,7 +29,7 @@ def test_create_restaurant(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     response_body = json.loads(response["body"])
 
@@ -55,7 +59,7 @@ def test_get_restaurants(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     response_body = json.loads(response["body"])
     restaurant_id = response_body["id"]
@@ -66,7 +70,7 @@ def test_get_restaurants(chalice_gateway, request):
         db.get_gen_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
     request.addfinalizer(resource_teardown)
 
-    response_get = make_request(chalice_gateway, endpoint="/restaurants", method="GET", token=token_user)
+    response_get = make_request(chalice_gateway, endpoint="/restaurants", method="GET", token=id_user)
 
     response_body_get = json.loads(response_get["body"])
 
@@ -86,7 +90,7 @@ def test_get_restaurant_by_id(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     response_body = json.loads(response["body"])
 
@@ -98,7 +102,7 @@ def test_get_restaurant_by_id(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     response_get = make_request(chalice_gateway, endpoint=f"/restaurants/{response_body['id']}",
-                                method="GET", token=token_restaurant_manager)
+                                method="GET", token=id_admin)
 
     response_body_get = json.loads(response_get["body"])
     assert response_get['statusCode'] == http200, f"status code not as expected"
@@ -117,7 +121,7 @@ def test_update_restaurant(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     response_body = json.loads(response["body"])
 
@@ -140,7 +144,7 @@ def test_update_restaurant(chalice_gateway, request):
         'new_field': 'new_value'
     }
     response = make_request(chalice_gateway, endpoint=f"/restaurants/{response_body['id']}", method="PUT",
-                            json_body={**fields_to_update, **wrong_fields_to_update}, token=token_admin)
+                            json_body={**fields_to_update, **wrong_fields_to_update}, token=id_admin)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
@@ -163,7 +167,7 @@ def test_archive_restaurant(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     response_body = json.loads(response["body"])
 
@@ -175,7 +179,7 @@ def test_archive_restaurant(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     response = make_request(chalice_gateway, endpoint=f"/restaurants/{response_body['id']}",
-                            method="DELETE", json_body={}, token=token_admin)
+                            method="DELETE", json_body={}, token=id_admin)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 

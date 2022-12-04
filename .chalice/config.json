@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "app_name": "restaurant-menu-and-order",
+  "app_name": "restaurant-order-and-delivery",
   "stages": {
     "localdev": {
       "autogen_policy": false,

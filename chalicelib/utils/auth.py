@@ -7,6 +7,7 @@ from chalice import Response
 
 # from chalicelib.constants.auth import COGNITO_JWK_URL, COGNITO_IDP_URL
 from chalicelib.constants import status_codes
+from chalicelib.users import User
 from chalicelib.utils import exceptions as utils_exceptions
 from chalicelib.utils.app import error_response
 from chalicelib.utils.logger import log_request, logger, log_exception
@@ -22,18 +23,15 @@ def authenticate(func):
             request = args[0]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
-            user_id = '13303309-d941-486f-b600-3e90929ac50f'
+            user_id = request.headers['authorization']
+            user: User = User.init_by_id(user_id)
             if user_id:
-                setattr(
-                    request,
-                    'auth_result',
-                    {'user_id': user_id}
-                )
+                setattr(request, 'auth_result', {'user_id': user.id_, 'role': user.role})
                 result = func(*args, **kwargs)
                 logger.info(f'authenticate ::: SUCCESS, func.__name__ {func.__name__}')
                 return result
             else:
-                raise utils_exceptions.NotAuthorizedException('No user_id in request')
+                raise utils_exceptions.NotAuthorizedException('Error occurred in authorization process')
         except Exception as err:
             logger.error(f"authenticate ::: {str(err)}")
             return error_response(err, msg=f'{func.__name__}')
@@ -52,17 +50,15 @@ def authenticate_class(func):
             request = args[1]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
-            user_id = '13303309-d941-486f-b600-3e90929ac50f'
-            if user_id:
-                setattr(
-                    request,
-                    'auth_result',
-                    {'user_id': user_id}
-                )
-                setattr(instance, 'user_id', user_id)
+            user_id = request.headers['authorization']
+            user: User = User.init_by_id(user_id)
+            if user:
+                setattr(request, 'auth_result', {'user_id': user.id_, 'role': user.role})
+                setattr(instance, 'user_id', user.id_)
+                setattr(instance, 'role', user.role)
                 return func(*args, **kwargs)
             else:
-                raise utils_exceptions.NotAuthorizedException('No user_id in request')
+                raise utils_exceptions.NotAuthorizedException('Error occurred in authorization process')
         except Exception as err:
             logger.error(f"authenticate_class ::: {str(err)}")
             return error_response(err, msg=f'{func.__name__}')

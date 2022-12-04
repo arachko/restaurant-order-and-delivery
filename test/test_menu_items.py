@@ -14,6 +14,10 @@ token_admin = 'admin'
 token_restaurant_manager = 'restaurant_manager'
 token_user = 'user'
 
+id_admin = '13303309-d941-486f-b600-3e90929ac50f'
+id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
+id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
+
 
 def create_test_restaurant(chalice_gateway):
     restaurant_to_create = {
@@ -25,7 +29,7 @@ def create_test_restaurant(chalice_gateway):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
     id_ = json.loads(response["body"])["id"]
     pk = keys_structure.restaurants_pk
     sk = keys_structure.restaurants_sk.format(restaurant_id=id_)
@@ -40,7 +44,7 @@ def create_test_menu_item(chalice_gateway, restaurant_id):
         'price': 130.99
     }
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="POST",
-                            json_body=menu_item_to_create, token=token_restaurant_manager)
+                            json_body=menu_item_to_create, token=id_restaurant_manager)
 
     id_ = json.loads(response["body"])["id"]
     pk = keys_structure.menu_items_pk.format(restaurant_id=restaurant_id)
@@ -60,7 +64,7 @@ def test_create_menu_item(chalice_gateway, request):
     }
 
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="POST",
-                            json_body=menu_item_to_create, token=token_restaurant_manager)
+                            json_body=menu_item_to_create, token=id_restaurant_manager)
 
     response_body = json.loads(response["body"])
 
@@ -91,7 +95,7 @@ def test_get_menu_items(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     response_get = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}",
-                                method="GET", token=token_user)
+                                method="GET", token=id_user)
 
     response_body_get = json.loads(response_get["body"])
     assert response_get['statusCode'] == http200, f"status code not as expected"
@@ -123,7 +127,7 @@ def test_update_menu_item(chalice_gateway, request):
         'new_field': 'new_value'
     }
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}/{menu_item_id}", method="PUT",
-                            json_body={**fields_to_update, **wrong_fields_to_update}, token=token_restaurant_manager)
+                            json_body={**fields_to_update, **wrong_fields_to_update}, token=id_restaurant_manager)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
@@ -149,7 +153,7 @@ def test_archive_menu_item(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}/{menu_item_id}",
-                            method="DELETE", token=token_restaurant_manager)
+                            method="DELETE", token=id_restaurant_manager)
 
     assert response['statusCode'] == http200, f"status code not as expected"
 

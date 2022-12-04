@@ -15,6 +15,10 @@ token_admin = 'admin'
 token_restaurant_manager = 'restaurant_manager'
 token_user = 'user'
 
+id_admin = '13303309-d941-486f-b600-3e90929ac50f'
+id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
+id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
+
 
 def create_test_restaurant(chalice_gateway, request):
     restaurant_to_create = {
@@ -26,7 +30,7 @@ def create_test_restaurant(chalice_gateway, request):
         'closing_time': 23
     }
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
-                            json_body=restaurant_to_create, token=token_admin)
+                            json_body=restaurant_to_create, token=id_admin)
 
     id_ = json.loads(response["body"])["id"]
 
@@ -54,10 +58,10 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
         'price': 18.50
     }
     response = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="POST",
-                            json_body=menu_item_to_create, token=token_restaurant_manager)
+                            json_body=menu_item_to_create, token=id_restaurant_manager)
 
     response_2 = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="POST",
-                              json_body=menu_item_to_create_2, token=token_restaurant_manager)
+                              json_body=menu_item_to_create_2, token=id_restaurant_manager)
 
     id_ = json.loads(response["body"])["id"]
     id_2 = json.loads(response_2["body"])["id"]
@@ -86,7 +90,8 @@ def create_test_pre_order(chalice_gateway, restaurant_id, menu_item_to_order_1, 
         'comment': 'Please deliver my order ASAP'
     }
 
-    response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized", method="POST", json_body=order_data)
+    response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized",
+                            method="POST", json_body=order_data)
 
     response_body = json.loads(response["body"])
     id_ = response_body['id']
@@ -131,7 +136,8 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
         'comment': 'Please deliver my order ASAP'
     }
 
-    response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized", method="POST", json_body=order_data)
+    response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized",
+                            method="POST", json_body=order_data)
 
     response_body = json.loads(response["body"])
     order_id = response_body['id']
@@ -207,7 +213,7 @@ def test_get_order_by_id_unauthorized_user(chalice_gateway, request):
     pre_order_id = create_test_pre_order(chalice_gateway, restaurant_id, menu_item_id, menu_item_id_2, request)
     order_id = create_test_order(chalice_gateway, pre_order_id, restaurant_id, request)
 
-    response = make_request(chalice_gateway, endpoint=f"/orders/unauthorized/{order_id}", method="GET")
+    response = make_request(chalice_gateway, endpoint=f"/orders/unauthorized/{restaurant_id}/{order_id}", method="GET")
 
     response_body = json.loads(response["body"])
 

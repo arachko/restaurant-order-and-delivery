@@ -1,46 +1,68 @@
 from chalice import AuthResponse, AuthRoute
 
+from chalicelib.users import User
+from chalicelib.utils.exceptions import AuthorizationException
+
 
 def test_auth(auth_request):
-    token = auth_request.token
-    if token == 'health-check':
-        return AuthResponse(
-            routes=[
-                '/',
-                AuthRoute(path='/health-check', methods=['GET'])
-            ], principal_id='user'
-        )
-    elif token == 'user':
+    user_id = auth_request.token
+    user: User = User.init_by_id(user_id)
+    if user.role == 'user':
         return AuthResponse(
             routes=[
                 AuthRoute(path='/restaurants', methods=['GET']),
-                AuthRoute(path='/menu-items/*', methods=['GET'])
+                AuthRoute(path='/restaurants/*', methods=['GET']),
+                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
+                AuthRoute(path='/menu-items/*', methods=['GET']),
+                AuthRoute(path='/carts', methods=['GET']),
+                AuthRoute(path='/carts/*/*', methods=['POST']),
+                AuthRoute(path='/carts/*', methods=['DELETE']),
+                AuthRoute(path='/carts', methods=['DELETE']),
+                AuthRoute(path='/orders', methods=['GET']),
+                AuthRoute(path='/orders/*', methods=['GET']),
+                AuthRoute(path='/orders/archived/*', methods=['GET']),
+                AuthRoute(path='/orders/pre-order', methods=['POST']),
+                AuthRoute(path='/orders', methods=['POST']),
+                AuthRoute(path='/orders/*', methods=['DELETE'])
             ],
             principal_id='user'
         )
-    elif token == 'restaurant_manager':
+    elif user.role == 'restaurant_manager':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/restaurants/*', methods=['GET'])
+                AuthRoute(path='/restaurants', methods=['GET']),
+                AuthRoute(path='/restaurants/*', methods=['GET']),
+                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
+                AuthRoute(path='/menu-items/*', methods=['GET', 'POST']),
+                AuthRoute(path='/menu-items/*/*', methods=['PUT', 'DELETE']),
+                AuthRoute(path='/orders', methods=['GET']),
+                AuthRoute(path='/orders/*', methods=['GET']),
+                AuthRoute(path='/orders/archived/*', methods=['GET']),
+                AuthRoute(path='/orders/{order_id}', methods=['DELETE']),
+                AuthRoute(path='/orders/*', methods=['PUT', 'DELETE']),
+                AuthRoute(path='/image-upload/*/*', methods=['PUT'])
             ],
             principal_id='restaurant_manager'
         )
-    elif token == 'admin':
+    elif user.role == 'admin':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/restaurants', methods=['POST', 'GET']),
-                AuthRoute(path='/restaurants/*', methods=['GET', 'PUT', 'DELETE'])
+                AuthRoute(path='/users', methods=['POST']),
+                AuthRoute(path='/restaurants', methods=['GET', 'POST']),
+                AuthRoute(path='/restaurants/*', methods=['GET', 'PUT', 'DELETE']),
+                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
+                AuthRoute(path='/orders/restaurant/*', methods=['GET']),
+                AuthRoute(path='/orders/user/*', methods=['GET']),
+                AuthRoute(path='/orders/archived/restaurant/*/*', methods=['GET']),
+                AuthRoute(path='/orders/archived/user/*/*', methods=['GET']),
+                AuthRoute(path='/orders/*', methods=['DELETE']),
+                AuthRoute(path='/orders/user/*', methods=['GET']),
+                AuthRoute(path='/image-upload/*/*', methods=['PUT'])
             ],
             principal_id='admin'
         )
     else:
-        return AuthResponse(
-            routes=[
-                AuthRoute(path='/menu-items/*', methods=['GET']),
-                AuthRoute(path='/restaurants/*', methods=['GET'])
-            ],
-            principal_id='user'
-        )
+        raise AuthorizationException('User role not specified')
 
 
 # import uuid # for public id
