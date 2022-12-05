@@ -10,6 +10,7 @@ def test_auth(auth_request):
     if user.role == 'user':
         return AuthResponse(
             routes=[
+                AuthRoute(path='/users', methods=['GET', 'PUT']),
                 AuthRoute(path='/restaurants', methods=['GET']),
                 AuthRoute(path='/restaurants/*', methods=['GET']),
                 AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),

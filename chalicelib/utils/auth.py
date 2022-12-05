@@ -6,11 +6,17 @@ import json
 from chalice import Response
 
 # from chalicelib.constants.auth import COGNITO_JWK_URL, COGNITO_IDP_URL
-from chalicelib.constants import status_codes
-from chalicelib.users import User
-from chalicelib.utils import exceptions as utils_exceptions
+from chalicelib.constants import status_codes, keys_structure
+from chalicelib.utils import exceptions as utils_exceptions, db as utils_db
 from chalicelib.utils.app import error_response
 from chalicelib.utils.logger import log_request, logger, log_exception
+
+
+def get_user_role(user_id):
+    return utils_db.get_db_item(
+        partkey=keys_structure.users_pk,
+        sortkey=keys_structure.users_sk.format(user_id=user_id)
+    ).get('role')
 
 
 def authenticate(func):
@@ -24,9 +30,9 @@ def authenticate(func):
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']
-            user: User = User.init_by_id(user_id)
+            user_role = get_user_role(user_id)
             if user_id:
-                setattr(request, 'auth_result', {'user_id': user.id_, 'role': user.role})
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role})
                 result = func(*args, **kwargs)
                 logger.info(f'authenticate ::: SUCCESS, func.__name__ {func.__name__}')
                 return result
@@ -51,11 +57,11 @@ def authenticate_class(func):
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']
-            user: User = User.init_by_id(user_id)
-            if user:
-                setattr(request, 'auth_result', {'user_id': user.id_, 'role': user.role})
-                setattr(instance, 'user_id', user.id_)
-                setattr(instance, 'role', user.role)
+            user_role = get_user_role(user_id)
+            if user_id:
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role})
+                setattr(instance, 'user_id', user_id)
+                setattr(instance, 'role', user_role)
                 return func(*args, **kwargs)
             else:
                 raise utils_exceptions.NotAuthorizedException('Error occurred in authorization process')

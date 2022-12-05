@@ -104,7 +104,7 @@ class MenuItem:
     @utils_app.log_start_finish
     def endpoint_update_menu_item(self) -> Response:
         self.update_menu_item()
-        return Response(status_code=http200, body={'message': 'Menu item successfully updated', 'id': self.id_})
+        return Response(status_code=http200, body={'message': 'Menu item was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk.format(restaurant_id=self.restaurant_id), self.sk.format(menu_item_id=self.id_)
@@ -176,12 +176,9 @@ class MenuItem:
 
     def validate_fields_update(self, update_dict):
         clean_dict = {}
+        validation_dict = {**self.required_mutable_fields_validation, **self.optional_fields_validation}
         for key, value in update_dict.items():
-            if key in self.required_mutable_fields_validation and \
-                    self.required_mutable_fields_validation[key](value) is True:
-                clean_dict[key] = value
-            elif key in self.optional_fields_validation and \
-                    self.optional_fields_validation[key](value) is True:
+            if key in validation_dict and validation_dict[key](value) is True:
                 clean_dict[key] = value
             else:
                 logger.warning(f'update_fields_validation ::: key={key}, value={value} is not valid, '
@@ -200,7 +197,7 @@ class MenuItem:
             allowed_attrs_to_update=self._update_white_fields_list(),
             allowed_attrs_to_delete=[]
         )
-        logger.info(f"update_menu_item ::: menu_item {self.id_} successfully updated")
+        logger.info(f"update_menu_item ::: menu_item {self.id_} was successfully updated")
 
     def to_ui(self):
         menu_item = self.to_dict()

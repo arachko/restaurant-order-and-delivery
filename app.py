@@ -1,6 +1,6 @@
 from chalice import Chalice
 
-from chalicelib import auth, orders, carts, menu_items, restaurants, images
+from chalicelib import auth, orders, carts, menu_items, restaurants, images, users
 from chalicelib.constants.constants import UNAUTHORIZED_USER
 
 app = Chalice(app_name='restaurant-order-and-delivery')
@@ -11,10 +11,15 @@ def test_auth(auth_request):
     return auth.test_auth(auth_request)
 
 
-@app.route('/users', methods=['POST'], cors=True)
-def create_user():
-    user_as_json = app.current_request.json_body
-    return {'user': user_as_json}
+# USERS
+@app.route('/users', methods=['GET'], authorizer=test_auth, cors=True)
+def get_user():
+    return users.User.init_request_get(app.current_request).endpoint_get_user()
+
+
+@app.route('/users', methods=['PUT'], authorizer=test_auth, cors=True)
+def update_user():
+    return users.User.init_request_update(app.current_request).endpoint_update_user()
 
 
 # RESTAURANTS

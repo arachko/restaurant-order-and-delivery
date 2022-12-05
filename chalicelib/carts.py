@@ -142,9 +142,9 @@ class Cart:
             allowed_attrs_to_update=self._update_white_fields_list(),
             allowed_attrs_to_delete=[]
         )
-        logger.info(f"update_item_list_in_db ::: item list in the cart successfully updated")
+        logger.info(f"update_item_list_in_db ::: item list in the cart was successfully updated")
 
     def _delete_db_record(self):
         pk, sk = self._get_pk_sk()
         utils_db.get_gen_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
-        logger.info(f"delete_db_record ::: item list in the cart successfully updated")
+        logger.info(f"delete_db_record ::: item list in the cart was successfully updated")

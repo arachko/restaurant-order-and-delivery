@@ -118,7 +118,7 @@ class Restaurant:
     @utils_app.log_start_finish
     def endpoint_update_restaurant(self) -> Response:
         self.update_restaurant()
-        return Response(status_code=http200, body={'message': 'Restaurant successfully updated', 'id': self.id_})
+        return Response(status_code=http200, body={'message': 'Restaurant was successfully updated', 'id': self.id_})
 
     def _get_restaurant_pk_sk(self) -> Tuple[str, str]:
         return self.pk, self.sk.format(restaurant_id=self.id_)
@@ -196,7 +196,7 @@ class Restaurant:
             allowed_attrs_to_update=self._restaurant_update_white_fields_list(),
             allowed_attrs_to_delete=[]
         )
-        logger.info(f"update_restaurant ::: restaurant {self.id_} successfully updated")
+        logger.info(f"update_restaurant ::: restaurant {self.id_} was successfully updated")
 
     def to_ui(self):
         restaurant = self.to_dict()
