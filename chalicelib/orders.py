@@ -12,6 +12,7 @@ from chalicelib.constants.constants import UNAUTHORIZED_USER
 from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.menu_items import MenuItem
+from chalicelib.restaurants import Restaurant
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
 from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound
@@ -27,13 +28,14 @@ class PreOrder:
         'user_id': lambda x: isinstance(x, str) or None,
         'user_phone_number': lambda x: isinstance(x, str),
         'restaurant_id': lambda x: isinstance(x, str),
-        'delivery_address': lambda x: isinstance(x, str),
         'date_created': lambda x: isinstance(x, str)
     }
 
     required_mutable_fields_validation = {
         'item_ids': lambda x: isinstance(x, list),
         'amount': lambda x: isinstance(x, Decimal),
+        'delivery_address': lambda x: isinstance(x, str),
+        'delivery_price': lambda x: isinstance(x, Decimal),
         "archived": lambda x: isinstance(x, bool)
     }
 
@@ -52,8 +54,9 @@ class PreOrder:
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
         self.restaurant_id: str = kwargs.get('restaurant_id')
-        self.delivery_address: str = kwargs.get('delivery_address')
         self.item_ids: list = kwargs.get('item_ids', [])
+        self.delivery_address: str = kwargs.get('delivery_address')
+        self.delivery_price: Decimal = kwargs.get('delivery_price')
         self.amount: Decimal = kwargs.get('amount')
         self.date_created: str = datetime.today().isoformat(timespec='seconds')
         self.archived: bool = kwargs.get('archived', False)
@@ -67,18 +70,42 @@ class PreOrder:
         return cls(
             id_=str(uuid4()).split('-')[0],
             user_id=UNAUTHORIZED_USER,
-            **request_body
+            restaurant_id=request_body['restaurant_id'],
+            delivery_address=request_body['delivery_address'],
+            item_ids=request_body['item_ids'],
+            user_phone_number=request_body['user_phone_number'],
+            user_email=request_body.get('user_email'),
+            comment_=request_body.get('comment_')
         )
 
     @classmethod
-    def init_by_db_record(cls, pre_order_id, user_id):
-        c = cls(pre_order_id, user_id)
+    @utils_auth.authenticate_class
+    def init_request_create_pre_order_authorized_user(cls, request):
+        logger.info("init_request_create_pre_order_authorized_user ::: started")
+        user_id = request.to_dict().get('auth_result', {}).get('user_id')
+        cart: Cart = Cart.init_by_user_id(user_id)
+        request_body = utils_data.parse_raw_body(request)
+        substitute_keys(request_body, to_db)
+        return cls(
+            id_=str(uuid4()).split('-')[0],
+            user_id=request.to_dict().get('auth_result', {}).get('user_id'),
+            restaurant_id=cart.restaurant_id,
+            delivery_address=request_body['delivery_address'],
+            item_ids=cart.item_ids,
+            user_phone_number=request_body['user_phone_number'],
+            user_email=request_body.get('user_email'),
+            comment_=request_body.get('comment_')
+        )
+
+    @classmethod
+    def init_by_db_record(cls, id_, user_id):
+        c = cls(id_, user_id)
         c.__init__(**c._get_db_item())
         return c
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_create_pre_order_unauthorized_user(self):
+    def endpoint_create_pre_order(self):
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
         self.create_pre_order()
         return Response(status_code=http200, body=self.to_ui())
@@ -97,6 +124,7 @@ class PreOrder:
             'user_email': self.user_email,
             'restaurant_id': self.restaurant_id,
             'delivery_address': self.delivery_address,
+            'delivery_price': self.delivery_price,
             'date_created': self.date_created,
             'item_ids': self.item_ids,
             'amount': self.amount,
@@ -127,7 +155,8 @@ class PreOrder:
         logger.info(f"validate_mandatory_fields ::: finished")
 
     def calculate_amount(self):
-        self.amount = Decimal(sum([item.price for item in self.menu_item_list])).quantize(Decimal('1.00'))
+        self.delivery_price = Restaurant.init_get_by_id(self.restaurant_id).get_delivery_price(self.delivery_address)
+        self.amount = Decimal(sum([item.price for item in self.menu_item_list])) + self.delivery_price.quantize(Decimal('1.00'))
 
     def check_items_availability(self):
         # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.item_ids]
@@ -169,7 +198,6 @@ class Order:
         'user_id': lambda x: isinstance(x, str),
         'user_phone_number': lambda x: isinstance(x, str),
         'restaurant_id': lambda x: isinstance(x, str),
-        'delivery_address': lambda x: isinstance(x, str),
         'date_created': lambda x: isinstance(x, str),
         'paid': lambda x: isinstance(x, bool)
     }
@@ -177,6 +205,8 @@ class Order:
     required_mutable_fields_validation = {
         'item_ids': lambda x: isinstance(x, list),
         'amount': lambda x: isinstance(x, Decimal),
+        'delivery_address': lambda x: isinstance(x, str),
+        'delivery_price': lambda x: isinstance(x, Decimal),
         "date_updated": lambda x: isinstance(x, str),
         "updated_by": lambda x: isinstance(x, str),
         "archived": lambda x: isinstance(x, bool)
@@ -200,8 +230,9 @@ class Order:
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
         self.restaurant_id: str = kwargs.get('restaurant_id')
-        self.delivery_address: str = kwargs.get('delivery_address')
         self.item_ids: list = kwargs.get('item_ids', [])
+        self.delivery_address: str = kwargs.get('delivery_address')
+        self.delivery_price: str = kwargs.get('delivery_price')
         self.amount: Decimal = Decimal(kwargs.get('amount')).quantize(Decimal('1.00')) if \
             type(kwargs.get('amount')) in [int, float, Decimal] else None
         self.date_created: str = kwargs.get('date_created') or datetime.today().isoformat(timespec='seconds')
@@ -209,31 +240,49 @@ class Order:
         self.paid: bool = kwargs.get('paid', False)
         self.history: list = kwargs.get('history', ['created'])
         self.date_updated: str = kwargs.get('date_updated') or datetime.today().isoformat(timespec='seconds')
-        self.updated_by: str = kwargs.get('updated_by') or user_id
+        self.updated_by: str = user_id
         self.archived: bool = kwargs.get('archived', False)
         self.feedback: str = kwargs.get('feedback')
         self.feedback_rate: Any[Decimal, None] = kwargs.get('feedback_rate', None)
 
     @classmethod
-    def init_request_create_order_unauthorized_user(cls, request):
-        logger.info("init_request_create_order_unauthorized_user ::: started")
-        user_id = UNAUTHORIZED_USER
+    @utils_auth.authenticate_class
+    def init_request_get_order(cls, request, order_id, restaurant_id):
+        logger.info("init_request_get_order_authorized_user ::: started")
+        user_id = request.to_dict().get('auth_result', {}).get('user_id')
+        return cls(order_id, user_id, restaurant_id=restaurant_id)
+
+    @classmethod
+    def init_create_order(cls, request, user_id):
         request_body = utils_data.parse_raw_body(request)
         id_ = request_body['pre_order_id']
         c = cls(id_, user_id)
         c.init_by_pre_order()
         return c
 
+    @classmethod
+    def init_request_create_order_unauthorized(cls, request):
+        logger.info("init_request_create_order_unauthorized_user ::: started")
+        user_id = UNAUTHORIZED_USER
+        return cls.init_create_order(request, user_id)
+
+    @classmethod
+    @utils_auth.authenticate_class
+    def init_request_create_order_authorized(cls, request):
+        logger.info("init_request_create_order_authorized_user ::: started")
+        user_id = request.to_dict().get('auth_result', {}).get('user_id')
+        return cls.init_create_order(request, user_id)
+
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_create_order_unauthorized_user(self):
+    def endpoint_create_order(self):
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
         self.create_order()
         return Response(status_code=http200, body=self.to_ui())
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_get_by_id_unauthorized_user(self):
+    def endpoint_get_by_id(self):
         self.__init__(**self._get_db_item_by_user_gsi())
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
         return Response(status_code=http200, body=self.to_ui())
@@ -273,6 +322,7 @@ class Order:
             'user_email': self.user_email,
             'restaurant_id': self.restaurant_id,
             'delivery_address': self.delivery_address,
+            'delivery_price': self.delivery_price,
             'date_created': self.date_created,
             'item_ids': self.item_ids,
             'amount': self.amount,

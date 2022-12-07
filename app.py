@@ -2,6 +2,7 @@ from chalice import Chalice
 
 from chalicelib import auth, orders, carts, menu_items, restaurants, images, users
 from chalicelib.constants.constants import UNAUTHORIZED_USER
+from chalicelib.utils import data as utils_data
 
 app = Chalice(app_name='restaurant-order-and-delivery')
 
@@ -34,8 +35,9 @@ def get_restaurant_by_id(restaurant_id):
         endpoint_get_restaurant_by_id()
 
 
-@app.route('/restaurants/{restaurant_id}/delivery-price/{address}', methods=['GET'], authorizer=test_auth, cors=True)
-def get_delivery_address(restaurant_id, address):
+@app.route('/restaurants/{restaurant_id}/delivery-price', methods=['POST'], authorizer=test_auth, cors=True)
+def get_delivery_address(restaurant_id):
+    address = utils_data.parse_raw_body(app.current_request).get('delivery_address')
     return restaurants.Restaurant.init_request_get_by_id(app.current_request, restaurant_id).\
         endpoint_get_delivery_price(address)
 
@@ -183,18 +185,17 @@ def get_user_archived_orders(user_id, year_month):
     return orders.get_user_archived_orders(app.current_request, user_id, year_month)
 
 
-# Todo: TO BE IMPLEMENTED
-@app.route('/orders/{order_id}', methods=['GET'], authorizer=test_auth, cors=True)
-def get_order_by_id(order_id):
+@app.route('/orders/id/{restaurant_id}/{order_id}', methods=['GET'], authorizer=test_auth, cors=True)
+def get_order_by_id(order_id, restaurant_id):
     """
     user can get details only his orders
     restaurant manager can get details for any restaurant's orders
     admin can get details of any order
     """
-    return orders.get_order_by_id(app.current_request, order_id)
+    return orders.Order.init_request_get_order(app.current_request, order_id, restaurant_id).endpoint_get_by_id()
 
 
-@app.route('/orders/unauthorized/{restaurant_id}/{order_id}', methods=['GET'], cors=True)
+@app.route('/orders/id/unauthorized/{restaurant_id}/{order_id}', methods=['GET'], cors=True)
 def get_order_by_id_unauthorized(restaurant_id, order_id):
     """
     Unauthorized user can get details of an order
@@ -202,7 +203,7 @@ def get_order_by_id_unauthorized(restaurant_id, order_id):
     Authorization is not needed
     """
     return orders.Order(id_=order_id, user_id=UNAUTHORIZED_USER, restaurant_id=restaurant_id).\
-        endpoint_get_by_id_unauthorized_user()
+        endpoint_get_by_id()
 
 
 @app.route('/orders/pre-order/unauthorized', methods=['POST'], cors=True)
@@ -212,7 +213,7 @@ def create_pre_order_unauthorized():
     Authorization is not needed
     """
     return orders.PreOrder.init_request_create_pre_order_unauthorized_user(app.current_request).\
-        endpoint_create_pre_order_unauthorized_user()
+        endpoint_create_pre_order()
 
 
 @app.route('/orders/unauthorized', methods=['POST'], cors=True)
@@ -221,28 +222,25 @@ def create_order_unauthorized():
     The endpoint is for creating orders by unauthorized users
     Authorization is not needed
     """
-    return orders.Order.init_request_create_order_unauthorized_user(app.current_request).\
-        endpoint_create_order_unauthorized_user()
+    return orders.Order.init_request_create_order_unauthorized(app.current_request).endpoint_create_order()
 
 
-# Todo: TO BE IMPLEMENTED
 @app.route('/orders/pre-order', methods=['POST'], authorizer=test_auth, cors=True)
-def create_pre_order_unauthorized():
+def create_pre_order_authorized():
     """
     The endpoint is for creating pre-orders by authorized users
+    order details will be taken from user's cart
     """
-    return orders.PreOrder.init_request_create_pre_order(app.current_request).\
+    return orders.PreOrder.init_request_create_pre_order_authorized_user(app.current_request).\
         endpoint_create_pre_order()
 
 
-# Todo: TO BE IMPLEMENTED
 @app.route('/orders', methods=['POST'], authorizer=test_auth, cors=True)
 def create_order_authorized():
     """
     The endpoint is for creating orders by authorized users
     """
-    return orders.Order.init_request_create_order(app.current_request).\
-        endpoint_create_order()
+    return orders.Order.init_request_create_order_authorized(app.current_request).endpoint_create_order()
 
 
 # Todo: TO BE IMPLEMENTED

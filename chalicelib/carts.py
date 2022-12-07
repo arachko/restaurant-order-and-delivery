@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Tuple
 
 from chalice import Response
@@ -6,7 +7,6 @@ from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.menu_items import MenuItem
-from chalicelib.restaurants import Restaurant
 from chalicelib.utils import auth as utils_auth, db as utils_db, app as utils_app, data as utils_data
 from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.exceptions import RecordNotFound
@@ -23,18 +23,17 @@ class Cart:
     }
 
     required_mutable_fields_validation = {
-        'items_': lambda x: isinstance(x, list),
-        'delivery_address': lambda x: isinstance(x, str),
+        'item_ids': lambda x: isinstance(x, list),
+        'delivery_address': lambda x: isinstance(x, str)
     }
 
-    def __init__(self, **kwargs):
-        self.user_id = kwargs.get('user_id') or kwargs.get('request_data').get('auth_result', {}).get('user_id')
+    def __init__(self, user_id, address=None):
+        self.user_id = user_id
 
         self.db_record: dict = {}
         self.restaurant_id = None
-        self.delivery_address = kwargs.get('request_body').get('address', None)
-        self.delivery_price = None
-        self.items_ = []
+        self.delivery_address = address
+        self.item_ids = []
 
     @classmethod
     def init_by_user_id(cls, user_id):
@@ -47,8 +46,8 @@ class Cart:
     def init_endpoint(cls, request):
         logger.info("init_request_cart ::: started")
         return cls(
-            request_data=request.to_dict(),
-            request_body=utils_data.parse_raw_body(request)
+            user_id=request.to_dict().get('auth_result', {}).get('user_id'),
+            address=utils_data.parse_raw_body(request).get('address', None)
         )
 
     @utils_app.request_exception_handler
@@ -62,11 +61,10 @@ class Cart:
     def endpoint_add_item_to_cart(self, restaurant_id, menu_item_id):
         self._fill_db_item()
         if restaurant_id != self.restaurant_id:
-            self.delivery_price = Restaurant.init_get_by_id(restaurant_id).get_delivery_price(self.delivery_address)
             self.restaurant_id = restaurant_id
             self._init_db_record()
             self._put_db_record()
-        self.items_.append(menu_item_id)
+        self.item_ids.append(menu_item_id)
         all_items_available: bool = self.check_and_update_available_items()
         self._update_item_list_in_db()
         notice_to_ui = 'Some items are not longer available and were deleted from the cart' if not all_items_available else None
@@ -76,7 +74,7 @@ class Cart:
     @utils_app.log_start_finish
     def endpoint_remove_item_from_cart(self, menu_item_id):
         self._fill_db_item()
-        self.items_.remove(menu_item_id)
+        self.item_ids.remove(menu_item_id)
         self._update_item_list_in_db()
         return Response(status_code=http200, body={'cart': self.to_ui()})
 
@@ -94,8 +92,7 @@ class Cart:
             'user_id': self.user_id,
             'restaurant_id': self.restaurant_id,
             'delivery_address': self.delivery_address,
-            'delivery_price': self.delivery_price,
-            'items_': self.items_
+            'item_ids': self.item_ids
         }
 
     def _init_db_record(self):
@@ -111,8 +108,7 @@ class Cart:
             self.db_record = utils_db.get_db_item(*self._get_pk_sk())
             self.restaurant_id = self.db_record.get('restaurant_id')
             self.delivery_address = self.db_record.get('delivery_address')
-            self.delivery_price = self.db_record.get('delivery_price')
-            self.items_ = self.db_record.get('items_')
+            self.item_ids = self.db_record.get('item_ids')
         except RecordNotFound:
             self._init_db_record()
 
@@ -126,10 +122,10 @@ class Cart:
         return menu_item
 
     def check_and_update_available_items(self) -> bool:
-        items_num = len(self.items_)
-        self.items_ = [item_id for item_id in self.items_ if
-                       MenuItem.init_get_by_id(item_id, self.restaurant_id).is_available]
-        return True if items_num == len(self.items_) else False
+        items_num = len(self.item_ids)
+        self.item_ids = [item_id for item_id in self.item_ids if
+                         MenuItem.init_get_by_id(item_id, self.restaurant_id).is_available]
+        return True if items_num == len(self.item_ids) else False
 
     def _update_white_fields_list(self):
         return list(self.required_mutable_fields_validation)
@@ -138,7 +134,7 @@ class Cart:
         pk, sk = self._get_pk_sk()
         utils_db.update_db_record(
             key={'partkey': pk, 'sortkey': sk},
-            update_body={'items_': self.items_},
+            update_body={'item_ids': self.item_ids},
             allowed_attrs_to_update=self._update_white_fields_list(),
             allowed_attrs_to_delete=[]
         )
