@@ -15,16 +15,13 @@ def test_auth(auth_request):
                 AuthRoute(path='/restaurants/*', methods=['GET']),
                 AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
                 AuthRoute(path='/menu-items/*', methods=['GET']),
-                AuthRoute(path='/carts', methods=['GET']),
+                AuthRoute(path='/carts', methods=['GET', 'DELETE']),
                 AuthRoute(path='/carts/*/*', methods=['POST']),
                 AuthRoute(path='/carts/*', methods=['DELETE']),
-                AuthRoute(path='/carts', methods=['DELETE']),
-                AuthRoute(path='/orders', methods=['GET']),
-                AuthRoute(path='/orders/*', methods=['GET']),
+                AuthRoute(path='/orders', methods=['GET', 'POST']),
+                AuthRoute(path='/orders/*', methods=['GET', 'DELETE']),
                 AuthRoute(path='/orders/archived/*', methods=['GET']),
-                AuthRoute(path='/orders/pre-order', methods=['POST']),
-                AuthRoute(path='/orders', methods=['POST']),
-                AuthRoute(path='/orders/*', methods=['DELETE'])
+                AuthRoute(path='/orders/pre-order', methods=['POST'])
             ],
             principal_id='user'
         )
@@ -37,7 +34,7 @@ def test_auth(auth_request):
                 AuthRoute(path='/menu-items/*', methods=['GET', 'POST']),
                 AuthRoute(path='/menu-items/*/*', methods=['PUT', 'DELETE']),
                 AuthRoute(path='/orders', methods=['GET']),
-                AuthRoute(path='/orders/*', methods=['GET']),
+                AuthRoute(path='/orders/restaurant/*', methods=['GET']),
                 AuthRoute(path='/orders/archived/*', methods=['GET']),
                 AuthRoute(path='/orders/{order_id}', methods=['DELETE']),
                 AuthRoute(path='/orders/*', methods=['PUT', 'DELETE']),
@@ -48,7 +45,6 @@ def test_auth(auth_request):
     elif user.role == 'admin':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/users', methods=['POST']),
                 AuthRoute(path='/restaurants', methods=['GET', 'POST']),
                 AuthRoute(path='/restaurants/*', methods=['GET', 'PUT', 'DELETE']),
                 AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),

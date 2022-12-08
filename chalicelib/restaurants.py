@@ -32,6 +32,7 @@ class Restaurant:
         'cuisine': lambda x: isinstance(x, List),
         'opening_time': lambda x: isinstance(x, Decimal),
         'closing_time': lambda x: isinstance(x, Decimal),
+        'settings': lambda x: isinstance(x, dict),
         'status_': lambda x: isinstance(x, str),
         "date_updated": lambda x: isinstance(x, str),
         "updated_by": lambda x: isinstance(x, str),
@@ -46,11 +47,12 @@ class Restaurant:
         self.title: str = kwargs.get('title')
         self.address: str = kwargs.get('address')
         self.description: str = kwargs.get('description')
-        self.cuisine: list = kwargs.get('cuisine')
+        self.cuisine: list = kwargs.get('cuisine', [])
         self.opening_time: Decimal = Decimal(kwargs.get('opening_time')).quantize(Decimal('1')) if \
             type(kwargs.get('opening_time')) is int else None
         self.closing_time: Decimal = Decimal(kwargs.get('closing_time')).quantize(Decimal('1')) if \
             type(kwargs.get('closing_time')) is int else None
+        self.settings: dict = kwargs.get('settings', {})
         self.status_: str = kwargs.get('status') or 'new'
         self.created_by: str = kwargs.get('created_by') or self.request_data.get('auth_result', {}).get('user_id')
         self.updated_by: str = kwargs.get('updated_by') or self.request_data.get('auth_result', {}).get('user_id')
@@ -74,7 +76,6 @@ class Restaurant:
         return c
 
     @classmethod
-    @utils_auth.authenticate_class
     def init_request_get_by_id(cls, request, restaurant_id):
         logger.info("init_request_get_by_id ::: started")
         c = cls(restaurant_id)
@@ -138,6 +139,7 @@ class Restaurant:
             'cuisine': self.cuisine,
             'opening_time': self.opening_time,
             'closing_time': self.closing_time,
+            'settings': self.settings,
             'status_': self.status_,
             "date_created": self.date_created,
             "date_updated": self.date_updated,
@@ -201,6 +203,9 @@ class Restaurant:
     def to_ui(self):
         restaurant = self.to_dict()
         substitute_keys(dict_to_process=restaurant, base_keys=from_db)
+        restaurant['settings']['category_sequence'] = {
+            int(key): value for key, value in restaurant.get('settings', {}).get('category_sequence', {}).items()
+        }
         return restaurant
 
     def get_delivery_price(self, delivery_address):

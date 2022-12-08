@@ -391,4 +391,41 @@ def test_get_order_by_id_authorized_user(chalice_gateway, request):
     assert response_body['feedback'] is None
 
 
+def get_orders_base(chalice_gateway, request, url, token, restaurant_id=None):
+    if not restaurant_id:
+        restaurant_id = create_test_restaurant(chalice_gateway, request)
+    menu_item_id, menu_item_id_2 = create_test_menu_items(chalice_gateway, restaurant_id, request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id], request)
+    pre_order_id = create_test_pre_order_authorized_user(chalice_gateway, request)
+    order_id = create_test_order_authorized_user(chalice_gateway, pre_order_id, restaurant_id, request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id_2], request)
+    pre_order_id_2 = create_test_pre_order_authorized_user(chalice_gateway, request)
+    order_id_2 = create_test_order_authorized_user(chalice_gateway, pre_order_id_2, restaurant_id, request)
 
+    response = make_request(chalice_gateway, endpoint=url, token=token, method="GET")
+
+    response_body = json.loads(response["body"])
+    assert response['statusCode'] == http200, f"status code not as expected"
+    assert len(response_body) == 2
+    assert response_body[0]['id'] != response_body[1]['id']
+    for id_ in [order_id, order_id_2]:
+        assert id_ in [response_body[0]['id'], response_body[1]['id']]
+    for amount in [9.99, 18.50]:
+        assert amount in [response_body[0]['amount'], response_body[1]['amount']]
+
+
+@pytest.mark.local_db_test
+def test_get_orders(chalice_gateway, request):
+    get_orders_base(chalice_gateway, request, f"/orders", id_user)
+
+
+@pytest.mark.local_db_test
+def test_admin_get_user_orders(chalice_gateway, request):
+    get_orders_base(chalice_gateway, request, f"/orders/user/{id_user}", id_admin)
+
+
+@pytest.mark.local_db_test
+def test_rest_manager_get_restaurant_orders(chalice_gateway, request):
+    restaurant_id = create_test_restaurant(chalice_gateway, request)
+    get_orders_base(chalice_gateway, request, f"/orders/restaurant/{restaurant_id}",
+                    id_restaurant_manager, restaurant_id=restaurant_id)

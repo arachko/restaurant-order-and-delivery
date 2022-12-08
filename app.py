@@ -29,13 +29,13 @@ def get_restaurants():
     return restaurants.Restaurant.endpoint_get_restaurants(app.current_request)
 
 
-@app.route('/restaurants/{restaurant_id}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/restaurants/{restaurant_id}', methods=['GET'], cors=True)
 def get_restaurant_by_id(restaurant_id):
     return restaurants.Restaurant.init_request_get_by_id(app.current_request, restaurant_id).\
         endpoint_get_restaurant_by_id()
 
 
-@app.route('/restaurants/{restaurant_id}/delivery-price', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/restaurants/{restaurant_id}/delivery-price', methods=['POST'], cors=True)
 def get_delivery_address(restaurant_id):
     address = utils_data.parse_raw_body(app.current_request).get('delivery_address')
     return restaurants.Restaurant.init_request_get_by_id(app.current_request, restaurant_id).\
@@ -127,33 +127,31 @@ def clear_cart():
 
 
 # ORDERS
-# Todo: TO BE IMPLEMENTED
 @app.route('/orders', methods=['GET'], authorizer=test_auth, cors=True)
 def get_orders():
     """
     user can get his orders
-    restaurant manager can get restaurant's orders
+    restaurant manager don't have access
     admin don't have access
     """
-    return orders.get_orders(app.current_request)
+    return orders.endpoint_get_orders(app.current_request)
 
 
-# Todo: TO BE IMPLEMENTED
 @app.route('/orders/restaurant/{restaurant_id}', methods=['GET'], authorizer=test_auth, cors=True)
 def get_restaurant_orders(restaurant_id):
     """
+    restaurant manager can get restaurant's orders (he need permissions to manage the restaurant)
     admin can get restaurant's orders by restaurant_id
     """
-    return orders.get_restaurant_orders(app.current_request, restaurant_id)
+    return orders.endpoint_get_orders(app.current_request, 'restaurant', restaurant_id)
 
 
-# Todo: TO BE IMPLEMENTED
 @app.route('/orders/user/{user_id}', methods=['GET'], authorizer=test_auth, cors=True)
-def get_restaurant_orders(restaurant_id):
+def get_user_orders(user_id):
     """
-    admin can get restaurant's orders by restaurant_id
+    admin can get user's orders by user_id
     """
-    return orders.get_user_orders(app.current_request, restaurant_id)
+    return orders.endpoint_get_orders(app.current_request, 'user', user_id)
 
 
 # Todo: TO BE IMPLEMENTED

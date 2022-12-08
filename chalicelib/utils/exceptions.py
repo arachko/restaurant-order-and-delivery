@@ -1,6 +1,6 @@
 __all__ = ["NotAuthorizedException", "AccessDenied", "RecordNotFound", "NumberOfRetriesExceeded",
            "MandatoryFieldsAreNotFilled", "WrongDeliveryAddress", "SomeItemsAreNotAvailable", "OrderNotFound",
-           "AuthorizationException"]
+           "AuthorizationException", "MissingRestaurantId"]
 
 
 class NotAuthorizedException(Exception):
@@ -44,5 +44,9 @@ class SomeItemsAreNotAvailable(Exception):
 
 
 class OrderNotFound(Exception):
+    pass
+
+
+class MissingRestaurantId(Exception):
     pass
 

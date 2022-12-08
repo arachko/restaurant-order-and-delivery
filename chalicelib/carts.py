@@ -81,7 +81,7 @@ class Cart:
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_clear_cart(self):
-        self._delete_db_record()
+        self.delete_db_record()
         return Response(status_code=http200, body={'message': 'Cart was successfully cleared'})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
@@ -140,7 +140,7 @@ class Cart:
         )
         logger.info(f"update_item_list_in_db ::: item list in the cart was successfully updated")
 
-    def _delete_db_record(self):
+    def delete_db_record(self):
         pk, sk = self._get_pk_sk()
         utils_db.get_gen_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
         logger.info(f"delete_db_record ::: item list in the cart was successfully updated")

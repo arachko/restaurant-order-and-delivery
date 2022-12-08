@@ -15,7 +15,7 @@ from chalicelib.menu_items import MenuItem
 from chalicelib.restaurants import Restaurant
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
 from chalicelib.utils.data import substitute_keys
-from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound
+from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound, AccessDenied, MissingRestaurantId
 from chalicelib.utils.logger import logger
 
 
@@ -47,7 +47,7 @@ class PreOrder:
     def __init__(self, id_, user_id, **kwargs):
         self.request_data = kwargs.get('request_data', {})
 
-        self.menu_item_list: Any[List[MenuItem], None] = None
+        self.menu_item_list: List[MenuItem] = []
 
         self.id_: str = id_
         self.user_id: str = user_id
@@ -223,7 +223,7 @@ class Order:
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
         self.pre_order: Any[PreOrder, None] = None
-        self.menu_item_list: Any[List[MenuItem], None] = None
+        self.menu_item_list: List[MenuItem] = []
 
         self.id_: str = id_
         self.user_id: str = user_id or UNAUTHORIZED_USER
@@ -278,6 +278,7 @@ class Order:
     def endpoint_create_order(self):
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
         self.create_order()
+        Cart.init_by_user_id(user_id=self.user_id).delete_db_record()
         return Response(status_code=http200, body=self.to_ui())
 
     @utils_app.request_exception_handler
@@ -379,3 +380,39 @@ class Order:
         substitute_keys(dict_to_process=order, base_keys=from_db)
         return order
 
+
+def get_conditions_user(user_id):
+    return Key('gsi_user_orders_partkey').eq(Order.pk_gsi_user_orders.format(user_id=user_id)), 'gsi_user_orders'
+
+
+def get_conditions_rest_manager(restaurant_id):
+    if not restaurant_id:
+        raise MissingRestaurantId('restaurant_id must be provided in query parameters')
+    return Key('partkey').eq(Order.pk.format(restaurant_id=restaurant_id)), None
+
+
+@utils_app.request_exception_handler
+@utils_app.log_start_finish
+@utils_auth.authenticate
+def endpoint_get_orders(request, entity_type=None, entity_id=None):
+    user_role = request.to_dict().get('auth_result', {}).get('role')
+    user_id = request.to_dict().get('auth_result', {}).get('user_id')
+    match user_role:
+        case 'user':
+            key_condition_exp, index_name = get_conditions_user(user_id)
+        case 'restaurant_manager':
+            # Todo: check if the manager have permissions to the restaurant (by ID list in manager's record)
+            key_condition_exp, index_name = get_conditions_rest_manager(entity_id)
+        case 'admin':
+            if entity_type == 'user':
+                key_condition_exp, index_name = get_conditions_user(entity_id)
+            elif entity_type == 'restaurant':
+                key_condition_exp, index_name = get_conditions_rest_manager(entity_id)
+            else:
+                logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
+                raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')
+        case _:
+            raise AccessDenied(f"You don't have permissions to access this resource")
+
+    db_records = utils_db.query_items_paged(key_condition_expression=key_condition_exp, index_name=index_name)
+    return Response(status_code=http200, body=[Order(**record).to_ui() for record in db_records])

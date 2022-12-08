@@ -25,6 +25,13 @@ def test_create_restaurant(chalice_gateway, request):
         'address': 'Time Square, New York',
         'description': "This is my test restaurant",
         'cuisine': ['Chinese'],
+        'settings': {
+            "category_sequence": {
+                1: "breakfast",
+                2: "dinner",
+                3: "pizza"
+            }
+        },
         'opening_time': 10,
         'closing_time': 23
     }
@@ -43,6 +50,9 @@ def test_create_restaurant(chalice_gateway, request):
     assert response['statusCode'] == http200, f"status code not as expected"
     assert 'id' in response_body
     db_record = db.get_gen_table().get_item(Key={'partkey': pk, 'sortkey': sk})['Item']
+    db_record['settings']['category_sequence'] = {
+        int(key): value for key, value in db_record.get('settings', {}).get('category_sequence', {}).items()
+    }
     for key in restaurant_to_create:
         assert restaurant_to_create[key] == db_record[key]
     assert db_record['archived'] is False
@@ -55,6 +65,13 @@ def test_get_restaurants(chalice_gateway, request):
         'address': 'Time Square, New York',
         'description': "This is my test restaurant",
         'cuisine': ['Chinese'],
+        'settings': {
+            "category_sequence": {
+                1: "breakfast",
+                2: "dinner",
+                3: "pizza"
+            }
+        },
         'opening_time': 10,
         'closing_time': 23
     }
@@ -86,6 +103,13 @@ def test_get_restaurant_by_id(chalice_gateway, request):
         'address': 'Time Square, New York',
         'description': "This is my test restaurant",
         'cuisine': ['Chinese'],
+        'settings': {
+            "category_sequence": {
+                1: "breakfast",
+                2: "dinner",
+                3: "pizza"
+            }
+        },
         'opening_time': 10,
         'closing_time': 23
     }
@@ -117,6 +141,13 @@ def test_update_restaurant(chalice_gateway, request):
         'address': 'Time Square, New York',
         'description': "This is my test restaurant",
         'cuisine': ['Chinese'],
+        'settings': {
+            "category_sequence": {
+                1: "breakfast",
+                2: "dinner",
+                3: "pizza"
+            }
+        },
         'opening_time': 10,
         'closing_time': 23
     }
@@ -136,7 +167,14 @@ def test_update_restaurant(chalice_gateway, request):
         'title': 'updated restaurant title',
         'address': 'Time Square, New York, USA',
         'description': "This is my test restaurant",
-        'cuisine': ['Chinese', 'Japanese']
+        'cuisine': ['Chinese', 'Japanese'],
+        'settings': {
+            "category_sequence": {
+                1: "dinner",
+                2: "breakfast",
+                3: "pizza"
+            }
+        },
     }
     wrong_fields_to_update = {
         'created_by': 'wrong_string',
@@ -149,6 +187,9 @@ def test_update_restaurant(chalice_gateway, request):
     assert response['statusCode'] == http200, f"status code not as expected"
 
     db_record = db.get_gen_table().get_item(Key={'partkey': pk, 'sortkey': sk})['Item']
+    db_record['settings']['category_sequence'] = {
+        int(key): value for key, value in db_record.get('settings', {}).get('category_sequence', {}).items()
+    }
     for key in fields_to_update:
         assert fields_to_update[key] == db_record[key]
     for key in wrong_fields_to_update:
@@ -163,6 +204,13 @@ def test_archive_restaurant(chalice_gateway, request):
         'address': 'Time Square, New York',
         'description': "This is my test restaurant",
         'cuisine': ['Chinese'],
+        'settings': {
+            "category_sequence": {
+                1: "breakfast",
+                2: "dinner",
+                3: "pizza"
+            }
+        },
         'opening_time': 10,
         'closing_time': 23
     }
