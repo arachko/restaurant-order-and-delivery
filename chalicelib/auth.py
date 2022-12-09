@@ -3,6 +3,9 @@ from chalice import AuthResponse, AuthRoute
 from chalicelib.users import User
 from chalicelib.utils.exceptions import AuthorizationException
 
+UUID_PATTERN = '????????-????-4???-????-????????????'
+ORDER_ID_PATTERN = '????????'
+
 
 def test_auth(auth_request):
     user_id = auth_request.token
@@ -10,51 +13,50 @@ def test_auth(auth_request):
     if user.role == 'user':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/users', methods=['GET', 'PUT']),
-                AuthRoute(path='/restaurants', methods=['GET']),
-                AuthRoute(path='/restaurants/*', methods=['GET']),
-                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
-                AuthRoute(path='/menu-items/*', methods=['GET']),
-                AuthRoute(path='/carts', methods=['GET', 'DELETE']),
-                AuthRoute(path='/carts/*/*', methods=['POST']),
-                AuthRoute(path='/carts/*', methods=['DELETE']),
-                AuthRoute(path='/orders', methods=['GET', 'POST']),
-                AuthRoute(path='/orders/*', methods=['GET', 'DELETE']),
-                AuthRoute(path='/orders/archived/*', methods=['GET']),
-                AuthRoute(path='/orders/pre-order', methods=['POST'])
+                AuthRoute(path=f'/users', methods=['GET', 'PUT']),
+                AuthRoute(path=f'/restaurants', methods=['GET']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
+                AuthRoute(path=f'/menu-items/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/carts', methods=['GET', 'DELETE']),
+                AuthRoute(path=f'/carts/{UUID_PATTERN}/{UUID_PATTERN}', methods=['POST']),
+                AuthRoute(path=f'/carts/{UUID_PATTERN}', methods=['DELETE']),
+                AuthRoute(path=f'/carts', methods=['DELETE']),
+                AuthRoute(path=f'/orders', methods=['GET', 'POST']),
+                AuthRoute(path=f'/orders/id/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['GET', 'DELETE']),
+                AuthRoute(path=f'/orders/archived/*', methods=['GET']),
+                AuthRoute(path=f'/orders/pre-order', methods=['POST'])
             ],
             principal_id='user'
         )
     elif user.role == 'restaurant_manager':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/restaurants', methods=['GET']),
-                AuthRoute(path='/restaurants/*', methods=['GET']),
-                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
-                AuthRoute(path='/menu-items/*', methods=['GET', 'POST']),
-                AuthRoute(path='/menu-items/*/*', methods=['PUT', 'DELETE']),
-                AuthRoute(path='/orders', methods=['GET']),
-                AuthRoute(path='/orders/restaurant/*', methods=['GET']),
-                AuthRoute(path='/orders/archived/*', methods=['GET']),
-                AuthRoute(path='/orders/{order_id}', methods=['DELETE']),
-                AuthRoute(path='/orders/*', methods=['PUT', 'DELETE']),
-                AuthRoute(path='/image-upload/*/*', methods=['PUT'])
+                AuthRoute(path=f'/restaurants', methods=['GET']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
+                AuthRoute(path=f'/menu-items/{UUID_PATTERN}', methods=['GET', 'POST']),
+                AuthRoute(path=f'/menu-items/{UUID_PATTERN}/{UUID_PATTERN}', methods=['PUT', 'DELETE']),
+                AuthRoute(path=f'/orders', methods=['GET']),
+                AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/*', methods=['GET']),
+                AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['PUT', 'DELETE']),
+                AuthRoute(path=f'/image-upload/*/*', methods=['PUT'])
             ],
             principal_id='restaurant_manager'
         )
     elif user.role == 'admin':
         return AuthResponse(
             routes=[
-                AuthRoute(path='/restaurants', methods=['GET', 'POST']),
-                AuthRoute(path='/restaurants/*', methods=['GET', 'PUT', 'DELETE']),
-                AuthRoute(path='/restaurants/*/delivery-price/*', methods=['GET']),
-                AuthRoute(path='/orders/restaurant/*', methods=['GET']),
-                AuthRoute(path='/orders/user/*', methods=['GET']),
-                AuthRoute(path='/orders/archived/restaurant/*/*', methods=['GET']),
-                AuthRoute(path='/orders/archived/user/*/*', methods=['GET']),
-                AuthRoute(path='/orders/*', methods=['DELETE']),
-                AuthRoute(path='/orders/user/*', methods=['GET']),
-                AuthRoute(path='/image-upload/*/*', methods=['PUT'])
+                AuthRoute(path=f'/restaurants', methods=['GET', 'POST']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}', methods=['GET', 'PUT', 'DELETE']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
+                AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/user/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/restaurant/*/*', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/user/*/*', methods=['GET']),
+                AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['DELETE']),
+                AuthRoute(path=f'/image-upload/*/*', methods=['PUT'])
             ],
             principal_id='admin'
         )

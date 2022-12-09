@@ -71,7 +71,7 @@ def archive_restaurant(restaurant_id):
 
 
 # MENU ITEMS
-@app.route('/menu-items/{restaurant_id}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/menu-items/{restaurant_id}', methods=['GET'], cors=True)
 def get_restaurant_menu(restaurant_id):
     return menu_items.MenuItem.endpoint_get_menu_items(app.current_request, restaurant_id=restaurant_id)
 
@@ -242,7 +242,7 @@ def create_order_authorized():
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/{order_id}', methods=['PUT'], authorizer=test_auth, cors=True)
+@app.route('/orders/{restaurant_id}/{order_id}', methods=['PUT'], authorizer=test_auth, cors=True)
 def update_order():
     """
     restaurant manager operation (comment required when manager updating an order)
@@ -251,7 +251,7 @@ def update_order():
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/{order_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/orders/{restaurant_id}/{order_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
 def delete_order():
     """
     user can archive completed order

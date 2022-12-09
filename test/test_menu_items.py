@@ -94,8 +94,7 @@ def test_get_menu_items(chalice_gateway, request):
         db.get_gen_table().delete_item(Key={'partkey': menu_item_pk, 'sortkey': menu_item_sk})
     request.addfinalizer(resource_teardown)
 
-    response_get = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}",
-                                method="GET", token=id_user)
+    response_get = make_request(chalice_gateway, endpoint=f"/menu-items/{restaurant_id}", method="GET")
 
     response_body_get = json.loads(response_get["body"])
     assert response_get['statusCode'] == http200, f"status code not as expected"
