@@ -9,13 +9,19 @@
         "DEFAULT_REGION": "eu-central-1",
         "ENDPOINT_URL": "http://localhost:9000",
         "GEN_TABLE_NAME": "local",
-        "BUCKET_FOR_CONTAINER_FILES": "rmd-containers"
+        "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
+        "MAX_IMG_WIDTH": "900",
+        "MAX_THUMBNAIL_WIDTH": "200"
       }
     },
     "dev": {
       "api_gateway_stage": "api",
       "environment_variables": {
-        "GEN_TABLE_NAME": "rmd-gen-dev"
+        "DEFAULT_REGION": "eu-central-1",
+        "GEN_TABLE_NAME": "restmonster-gen-dev",
+        "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
+        "MAX_IMG_WIDTH": "900",
+        "MAX_THUMBNAIL_WIDTH": "200"
       }
     }
   }

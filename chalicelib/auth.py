@@ -41,7 +41,7 @@ def test_auth(auth_request):
                 AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
                 AuthRoute(path=f'/orders/archived/*', methods=['GET']),
                 AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['PUT', 'DELETE']),
-                AuthRoute(path=f'/image-upload/*/*', methods=['PUT'])
+                AuthRoute(path=f'/image-upload', methods=['POST'])
             ],
             principal_id='restaurant_manager'
         )
@@ -55,8 +55,7 @@ def test_auth(auth_request):
                 AuthRoute(path=f'/orders/user/{UUID_PATTERN}', methods=['GET']),
                 AuthRoute(path=f'/orders/archived/restaurant/*/*', methods=['GET']),
                 AuthRoute(path=f'/orders/archived/user/*/*', methods=['GET']),
-                AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['DELETE']),
-                AuthRoute(path=f'/image-upload/*/*', methods=['PUT'])
+                AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['DELETE'])
             ],
             principal_id='admin'
         )

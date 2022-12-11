@@ -31,8 +31,9 @@ def authenticate(func):
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']
             user_role = get_user_role(user_id)
+            company_id = 'aee9d9e6-eb8d-4105-b805-6937d6d6700f'
             if user_id:
-                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role})
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
                 result = func(*args, **kwargs)
                 logger.info(f'authenticate ::: SUCCESS, func.__name__ {func.__name__}')
                 return result
@@ -58,10 +59,12 @@ def authenticate_class(func):
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']
             user_role = get_user_role(user_id)
+            company_id = 'aee9d9e6-eb8d-4105-b805-6937d6d6700f'
             if user_id:
-                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role})
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
                 setattr(instance, 'user_id', user_id)
                 setattr(instance, 'role', user_role)
+                setattr(instance, 'company_id', company_id)
                 return func(*args, **kwargs)
             else:
                 raise utils_exceptions.NotAuthorizedException('Error occurred in authorization process')

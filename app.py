@@ -6,6 +6,9 @@ from chalicelib.utils import data as utils_data
 
 app = Chalice(app_name='restaurant-order-and-delivery')
 
+app.api.binary_types.insert(0, 'multipart/form-data')
+app.debug = True
+
 
 @app.authorizer()
 def test_auth(auth_request):
@@ -262,10 +265,9 @@ def delete_order():
 
 # IMAGES
 # Todo: TO BE IMPLEMENTED
-@app.route('/image-upload/{entity_type}/{entity_id}', methods=['POST'], authorizer=test_auth, cors=True)
-def image_upload(entity_type, entity_id):
+@app.route('/image-upload', methods=['POST'], content_types=['multipart/form-data'], authorizer=test_auth, cors=True)
+def image_upload():
     """
     restaurant manager operation
     """
-    return images.image_upload(app.current_request, entity_type, entity_id)
-
+    return images.image_upload(app.current_request)
