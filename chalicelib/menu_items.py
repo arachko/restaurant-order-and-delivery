@@ -6,15 +6,14 @@ from uuid import uuid4
 from boto3.dynamodb.conditions import Attr, Key
 from chalice import Response
 
+from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
-from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
-from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.logger import logger
 
 
-class MenuItem:
+class MenuItem(EntityBase):
     pk = keys_structure.menu_items_pk
     sk = keys_structure.menu_items_sk
 
@@ -43,10 +42,11 @@ class MenuItem:
     }
 
     def __init__(self, id_, restaurant_id, **kwargs):
+        EntityBase.__init__(self, id_)
+
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
 
-        self.id_: str = id_
         self.restaurant_id: str = restaurant_id
         self.title: str = kwargs.get('title')
         self.category: str = kwargs.get('category')
@@ -60,12 +60,13 @@ class MenuItem:
         self.weight: Decimal = Decimal(kwargs.get('weight')).quantize(Decimal('1')) if \
             type(kwargs.get('weight')) in [int, Decimal] else None
         self.options: list = kwargs.get('options', [])
-        self.is_available: str = kwargs.get('is_available', True)
+        self.is_available: bool = kwargs.get('is_available', True)
         self.created_by: str = kwargs.get('created_by') or self.request_data.get('auth_result', {}).get('user_id')
         self.updated_by: str = kwargs.get('updated_by') or self.request_data.get('auth_result', {}).get('user_id')
         self.date_created: str = kwargs.get('date_created') or datetime.now().isoformat(timespec="seconds")
         self.date_updated: str = kwargs.get('date_updated') or datetime.now().isoformat(timespec="seconds")
         self.archived: bool = kwargs.get('archived', False)
+        self.record_type = 'menu_item'
 
     @classmethod
     @utils_auth.authenticate_class
@@ -90,36 +91,30 @@ class MenuItem:
             Key('partkey').eq(keys_structure.menu_items_pk.format(restaurant_id=restaurant_id)),
             filter_expression=filter_expression
         )
-        menu_items: List[Dict] = [MenuItem(**record).to_ui() for record in menu_item_db_records]
+        menu_items: List[Dict] = [MenuItem(**record)._to_ui() for record in menu_item_db_records]
         logger.info(f"endpoint_get_restaurants ::: returning menu items={[rest['id'] for rest in menu_items]}")
         return Response(status_code=http200, body=menu_items)
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_create_menu_item(self) -> Response:
-        self.create_menu_item()
+        self._create_db_record()
         return Response(status_code=http200, body={'message': 'Menu item successfully created', 'id': self.id_})
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_update_menu_item(self) -> Response:
-        self.update_menu_item()
+        self._update_db_record()
         return Response(status_code=http200, body={'message': 'Menu item was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk.format(restaurant_id=self.restaurant_id), self.sk.format(menu_item_id=self.id_)
 
-    def _get_db_item(self):
-        return utils_db.get_db_item(*self._get_pk_sk())
-
-    def _update_white_fields_list(self):
-        return [*self.required_mutable_fields_validation.keys(), *self.optional_fields_validation.keys()]
-
-    def is_available_right_now(self):
+    def is_available_right_now(self) -> bool:
         # Todo: add opening-closing time check
         return self.is_available
 
-    def to_dict(self):
+    def _to_dict(self):
         return {
             'id_': self.id_,
             'restaurant_id': self.restaurant_id,
@@ -139,22 +134,13 @@ class MenuItem:
             'options': self.options
         }
 
-    def _init_db_record(self):
-        pk, sk = self._get_pk_sk()
-        self.db_record = {
-            'partkey': pk,
-            'sortkey': sk,
-            **self.to_dict()
-        }
-        substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
-
     @staticmethod
     def raise_validation_error(key):
         message = f'Validation error occurred while validating field={key}'
         logger.error(f"raise_validation_error ::: {message}")
         raise exceptions.ValidationException(message)
 
-    def validate_mandatory_fields(self):
+    def _validate_mandatory_fields(self):
         for key, validator_func in {
             **self.required_immutable_fields_validation,
             **self.required_mutable_fields_validation
@@ -162,45 +148,8 @@ class MenuItem:
             if validator_func(self.db_record.get(key)) is False:
                 self.raise_validation_error(key)
 
-    def validate_optional_fields(self):
+    def _validate_optional_fields(self):
         for key, validator_func in self.optional_fields_validation.items():
             if self.db_record.get(key) is not None and validator_func(self.db_record.get(key)) is False:
                 self.raise_validation_error(key)
-
-    def create_menu_item(self):
-        self._init_db_record()
-        self.validate_mandatory_fields()
-        self.validate_optional_fields()
-        utils_db.put_db_record(self.db_record)
-        logger.info(f"create_new_menu_item ::: menu_item {self.id_} successfully created")
-
-    def validate_fields_update(self, update_dict):
-        clean_dict = {}
-        validation_dict = {**self.required_mutable_fields_validation, **self.optional_fields_validation}
-        for key, value in update_dict.items():
-            if key in validation_dict and validation_dict[key](value) is True:
-                clean_dict[key] = value
-            else:
-                logger.warning(f'update_fields_validation ::: key={key}, value={value} is not valid, '
-                               f'removing from update dict..')
-        return clean_dict
-
-    def update_menu_item(self):
-        pk, sk = self._get_pk_sk()
-        self.date_updated = datetime.now().isoformat(timespec="seconds")
-        self.updated_by = self.request_data.get('auth_result', {}).get('user_id')
-        update_dict = self.validate_fields_update(self.to_dict())
-        substitute_keys(dict_to_process=update_dict, base_keys=to_db)
-        utils_db.update_db_record(
-            key={'partkey': pk, 'sortkey': sk},
-            update_body=update_dict,
-            allowed_attrs_to_update=self._update_white_fields_list(),
-            allowed_attrs_to_delete=[]
-        )
-        logger.info(f"update_menu_item ::: menu_item {self.id_} was successfully updated")
-
-    def to_ui(self):
-        menu_item = self.to_dict()
-        substitute_keys(dict_to_process=menu_item, base_keys=from_db)
-        return menu_item
 

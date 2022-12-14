@@ -6,16 +6,17 @@ from uuid import uuid4
 from boto3.dynamodb.conditions import Attr, Key
 from chalice import Response
 
+from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
-from chalicelib.constants.substitute_keys import to_db, from_db
+from chalicelib.constants.substitute_keys import from_db
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
 from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.exceptions import WrongDeliveryAddress
 from chalicelib.utils.logger import logger
 
 
-class Restaurant:
+class Restaurant(EntityBase):
     pk = keys_structure.restaurants_pk
     sk = keys_structure.restaurants_sk
 
@@ -40,10 +41,11 @@ class Restaurant:
     }
 
     def __init__(self, id_, **kwargs):
+        EntityBase.__init__(self, id_)
+
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
 
-        self.id_: str = id_
         self.title: str = kwargs.get('title')
         self.address: str = kwargs.get('address')
         self.description: str = kwargs.get('description')
@@ -59,6 +61,7 @@ class Restaurant:
         self.date_created: str = kwargs.get('date_created') or datetime.now().isoformat(timespec="seconds")
         self.date_updated: str = kwargs.get('date_updated') or datetime.now().isoformat(timespec="seconds")
         self.archived: bool = kwargs.get('archived', False)
+        self.record_type = 'restaurant'
 
     @classmethod
     @utils_auth.authenticate_class
@@ -72,32 +75,25 @@ class Restaurant:
     def init_get_by_id(cls, restaurant_id):
         logger.info("init_request_get_by_id ::: started")
         c = cls(restaurant_id)
-        c.__init__(**c._get_restaurant_db_item())
-        return c
-
-    @classmethod
-    def init_request_get_by_id(cls, request, restaurant_id):
-        logger.info("init_request_get_by_id ::: started")
-        c = cls(restaurant_id)
-        c.__init__(**c._get_restaurant_db_item())
+        c.__init__(**c._get_db_item())
         return c
 
     @staticmethod
     @utils_app.log_start_finish
-    def endpoint_get_restaurants(request) -> Response:
+    def endpoint_get_all(request) -> Response:
         filter_expression = Attr('archived').eq(False)
         restaurant_db_records: List[Dict] = utils_db.query_items_paged(
             Key('partkey').eq(keys_structure.restaurants_pk),
             filter_expression=filter_expression
         )
-        restaurants: List[Dict] = [Restaurant(**record).to_ui() for record in restaurant_db_records]
+        restaurants: List[Dict] = [Restaurant(**record)._to_ui() for record in restaurant_db_records]
         logger.info(f"endpoint_get_restaurants ::: returning restaurants={[rest['id'] for rest in restaurants]}")
         return Response(status_code=http200, body=restaurants)
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_get_restaurant_by_id(self) -> Response:
-        restaurant = self.to_ui()
+    def endpoint_get_by_id(self) -> Response:
+        restaurant = self._to_ui()
         logger.info(f"endpoint_get_restaurant_by_id ::: returning restaurant={restaurant}")
         return Response(status_code=http200, body=restaurant)
 
@@ -111,26 +107,20 @@ class Restaurant:
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_create_restaurant(self) -> Response:
-        self.create_new_restaurant()
+    def endpoint_create(self) -> Response:
+        self._create_db_record()
         return Response(status_code=http200, body={'message': 'Restaurant successfully created', 'id': self.id_})
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_update_restaurant(self) -> Response:
-        self.update_restaurant()
+    def endpoint_update(self) -> Response:
+        self._update_db_record()
         return Response(status_code=http200, body={'message': 'Restaurant was successfully updated', 'id': self.id_})
 
-    def _get_restaurant_pk_sk(self) -> Tuple[str, str]:
+    def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk, self.sk.format(restaurant_id=self.id_)
 
-    def _get_restaurant_db_item(self):
-        return utils_db.get_db_item(*self._get_restaurant_pk_sk())
-
-    def _restaurant_update_white_fields_list(self):
-        return list(self.required_mutable_fields_validation.keys())
-
-    def to_dict(self):
+    def _to_dict(self):
         return {
             'id_': self.id_,
             'title': self.title,
@@ -148,16 +138,7 @@ class Restaurant:
             "archived": self.archived
         }
 
-    def _init_new_restaurant_db_record(self):
-        pk, sk = self._get_restaurant_pk_sk()
-        self.db_record = {
-            'partkey': pk,
-            'sortkey': sk,
-            **self.to_dict()
-        }
-        substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
-
-    def validate_mandatory_fields(self):
+    def _validate_mandatory_fields(self):
         logger.info(f"validate_mandatory_fields ::: started")
         for key, validator_func in {
             **self.required_immutable_fields_validation,
@@ -169,44 +150,13 @@ class Restaurant:
                 raise exceptions.ValidationException(message)
         logger.info(f"validate_mandatory_fields ::: finished")
 
-    def create_new_restaurant(self):
-        self._init_new_restaurant_db_record()
-        self.validate_mandatory_fields()
-        utils_db.put_db_record(self.db_record)
-        logger.info(f"create_new_restaurant ::: restaurant {self.id_} successfully created")
-
-    def validate_mandatory_fields_update(self, update_dict):
-        clean_dict = {}
-        for key, value in update_dict.items():
-            if key in self.required_mutable_fields_validation and \
-                    self.required_mutable_fields_validation[key](value) is True:
-                clean_dict[key] = value
-            else:
-                logger.warning(f'update_fields_validation ::: key={key}, value={value} is not valid, '
-                               f'removing from update dict..')
-        return clean_dict
-
-    def update_restaurant(self):
-        pk, sk = self._get_restaurant_pk_sk()
-        self.date_updated = datetime.now().isoformat(timespec="seconds")
-        self.updated_by = self.request_data.get('auth_result', {}).get('user_id')
-        update_dict = self.validate_mandatory_fields_update(self.to_dict())
-        substitute_keys(dict_to_process=update_dict, base_keys=to_db)
-        utils_db.update_db_record(
-            key={'partkey': pk, 'sortkey': sk},
-            update_body=update_dict,
-            allowed_attrs_to_update=self._restaurant_update_white_fields_list(),
-            allowed_attrs_to_delete=[]
-        )
-        logger.info(f"update_restaurant ::: restaurant {self.id_} was successfully updated")
-
-    def to_ui(self):
-        restaurant = self.to_dict()
-        substitute_keys(dict_to_process=restaurant, base_keys=from_db)
-        restaurant['settings']['category_sequence'] = {
-            int(key): value for key, value in restaurant.get('settings', {}).get('category_sequence', {}).items()
+    def _to_ui(self):
+        item = self._to_dict()
+        item['settings']['category_sequence'] = {
+            int(key): value for key, value in item.get('settings', {}).get('category_sequence', {}).items()
         }
-        return restaurant
+        substitute_keys(dict_to_process=item, base_keys=from_db)
+        return item
 
     def get_delivery_price(self, delivery_address):
         """

@@ -29,19 +29,19 @@ def update_user():
 # RESTAURANTS
 @app.route('/restaurants', methods=['GET'], cors=True)
 def get_restaurants():
-    return restaurants.Restaurant.endpoint_get_restaurants(app.current_request)
+    return restaurants.Restaurant.endpoint_get_all(app.current_request)
 
 
 @app.route('/restaurants/{restaurant_id}', methods=['GET'], cors=True)
 def get_restaurant_by_id(restaurant_id):
-    return restaurants.Restaurant.init_request_get_by_id(app.current_request, restaurant_id).\
-        endpoint_get_restaurant_by_id()
+    return restaurants.Restaurant.init_get_by_id(restaurant_id).\
+        endpoint_get_by_id()
 
 
 @app.route('/restaurants/{restaurant_id}/delivery-price', methods=['POST'], cors=True)
 def get_delivery_address(restaurant_id):
     address = utils_data.parse_raw_body(app.current_request).get('delivery_address')
-    return restaurants.Restaurant.init_request_get_by_id(app.current_request, restaurant_id).\
+    return restaurants.Restaurant.init_get_by_id(restaurant_id).\
         endpoint_get_delivery_price(address)
 
 
@@ -50,7 +50,7 @@ def create_restaurant():
     """
     admin operation
     """
-    return restaurants.Restaurant.init_request_create_update(app.current_request).endpoint_create_restaurant()
+    return restaurants.Restaurant.init_request_create_update(app.current_request).endpoint_create()
 
 
 @app.route('/restaurants/{restaurant_id}', methods=['PUT'], authorizer=test_auth, cors=True)
@@ -59,7 +59,7 @@ def update_restaurant(restaurant_id):
     admin operation
     """
     return restaurants.Restaurant.init_request_create_update(app.current_request, restaurant_id).\
-        endpoint_update_restaurant()
+        endpoint_update()
 
 
 @app.route('/restaurants/{restaurant_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
@@ -70,7 +70,7 @@ def archive_restaurant(restaurant_id):
     return restaurants.Restaurant.init_request_create_update(
         app.current_request, restaurant_id=restaurant_id,
         special_body={'archived': True}
-    ).endpoint_update_restaurant()
+    ).endpoint_update()
 
 
 # MENU ITEMS

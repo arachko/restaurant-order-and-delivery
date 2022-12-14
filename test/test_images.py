@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from chalicelib.constants import keys_structure
 from chalicelib.constants.constants import MAIN_IMAGE_NAME, THUMB_IMAGE_NAME
@@ -63,6 +64,7 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
     return id_
 
 
+@pytest.mark.skip("Don't run the test each time because it put and delete images in s3 each time")
 def test_put_restaurant_image(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
     multipart_data = MultipartEncoder(
@@ -90,9 +92,10 @@ def test_put_restaurant_image(chalice_gateway, request):
     request.addfinalizer(resource_teardown_menu_items)
 
     response_body = json.loads(response["body"])
-    assert response_body == {'message': 'Image for menu_item was updated successfully'}
+    assert response_body == {'message': 'restaurant image was updated successfully'}
 
 
+@pytest.mark.skip("Don't run the test each time because it put and delete images in s3 each time")
 def test_put_menu_item_image(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
     menu_item_id = create_test_menu_items(chalice_gateway, restaurant_id, request)
@@ -122,5 +125,5 @@ def test_put_menu_item_image(chalice_gateway, request):
     request.addfinalizer(resource_teardown_menu_items)
 
     response_body = json.loads(response["body"])
-    assert response_body == {'message': 'Image for menu_item was updated successfully'}
+    assert response_body == {'message': 'menu_item image was updated successfully'}
 

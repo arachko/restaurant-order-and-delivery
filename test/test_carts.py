@@ -59,7 +59,7 @@ def test_get_cart(chalice_gateway, request):
     response_body = json.loads(response["body"]).get('cart')
 
     assert response['statusCode'] == http200, f"status code not as expected"
-    assert response_body['user_id'] == id_user
+    assert response_body['id'] == id_user
     assert response_body['restaurant_id'] is None
     assert response_body['delivery_address'] is None
     assert response_body['item_ids'] == []
@@ -84,7 +84,7 @@ def test_add_item_to_cart(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     def assert_cart_details(assert_dict, from_db=False):
-        assert assert_dict['user_id'] == id_user
+        assert id_user in [assert_dict.get('id_'), assert_dict.get('id')]
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['item_ids'] == [menu_item_id]
         if from_db is False:
@@ -123,7 +123,7 @@ def test_remove_item_from_cart(chalice_gateway, request):
     def assert_cart_details(assert_dict, from_db=False, item_ids=None):
         if item_ids is None:
             item_ids = [menu_item_id]
-        assert assert_dict['user_id'] == id_user
+        assert id_user in [assert_dict.get('id_'), assert_dict.get('id')]
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['item_ids'] == item_ids
         if from_db is False:
@@ -160,7 +160,7 @@ def test_clear_cart(chalice_gateway, request):
     request.addfinalizer(resource_teardown)
 
     def assert_cart_details(assert_dict):
-        assert assert_dict['user_id'] == id_user
+        assert assert_dict['id_'] == id_user
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['item_ids'] == [menu_item_id]
 

@@ -76,4 +76,4 @@ def image_upload(current_request) -> Response:
     upload_file_to_s3(content_main, path_main, 'application/octet-stream')
     upload_file_to_s3(content_thumb, path_thumb, 'application/octet-stream')
     return Response(status_code=http200, headers={"Content-Type": 'application/json'},
-                    body={'message': f'Image for {entity_type} was updated successfully'})
+                    body={'message': f'{entity_type} image was updated successfully'})

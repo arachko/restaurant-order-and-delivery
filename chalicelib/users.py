@@ -1,17 +1,15 @@
-from datetime import datetime
 from typing import Tuple
 
 from chalice import Response
 
+from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
-from chalicelib.constants.substitute_keys import from_db, to_db
-from chalicelib.utils import db as utils_db, auth as utils_auth, app as utils_app, data as utils_data
-from chalicelib.utils.data import substitute_keys
+from chalicelib.utils import auth as utils_auth, app as utils_app, data as utils_data
 from chalicelib.utils.logger import logger
 
 
-class User:
+class User(EntityBase):
     pk = keys_structure.users_pk
     sk = keys_structure.users_sk
 
@@ -36,7 +34,8 @@ class User:
     }
 
     def __init__(self, id_, **kwargs):
-        self.id_ = id_
+        EntityBase.__init__(self, id_)
+
         self.login = kwargs.get('login')
         self.phone = kwargs.get('phone', [])
         self.role = kwargs.get('role')
@@ -48,6 +47,7 @@ class User:
         self.additional_phone_numbers = kwargs.get('additional_phone_numbers', [])
         self.date_created = kwargs.get('date_created')
         self.date_updated = kwargs.get('date_updated')
+        self.record_type = 'user'
 
     @classmethod
     def init_by_id(cls, id_):
@@ -77,24 +77,18 @@ class User:
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_get_user(self) -> Response:
-        return Response(status_code=http200, body=self.to_ui())
+        return Response(status_code=http200, body=self._to_ui())
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_update_user(self) -> Response:
-        self.update_user()
+        self._update_db_record()
         return Response(status_code=http200, body={'message': 'User was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk, self.sk.format(user_id=self.id_)
 
-    def _get_db_item(self):
-        return utils_db.get_db_item(*self._get_pk_sk())
-
-    def _update_white_fields_list(self):
-        return [*self.required_mutable_fields_validation.keys(), *self.optional_fields_validation.keys()]
-
-    def to_dict(self):
+    def _to_dict(self):
         return {
             'id_': self.id_,
             'login': self.login,
@@ -108,32 +102,3 @@ class User:
             'addresses': self.addresses,
             'additional_phone_numbers': self.additional_phone_numbers
         }
-
-    def update_fields_validation(self, update_dict):
-        clean_dict = {}
-        validation_dict = {**self.required_mutable_fields_validation, **self.optional_fields_validation}
-        for key, value in update_dict.items():
-            if key in validation_dict and validation_dict[key](value) is True:
-                clean_dict[key] = value
-            else:
-                logger.warning(f'update_fields_validation ::: key={key}, value={value} is not valid, '
-                               f'removing from update dict..')
-        return clean_dict
-
-    def update_user(self):
-        pk, sk = self._get_pk_sk()
-        self.date_updated = datetime.now().isoformat(timespec="seconds")
-        update_dict = self.update_fields_validation(self.to_dict())
-        substitute_keys(dict_to_process=update_dict, base_keys=to_db)
-        utils_db.update_db_record(
-            key={'partkey': pk, 'sortkey': sk},
-            update_body=update_dict,
-            allowed_attrs_to_update=self._update_white_fields_list(),
-            allowed_attrs_to_delete=[]
-        )
-        logger.info(f"update_user ::: user {self.id_} was successfully updated")
-
-    def to_ui(self):
-        user = self.to_dict()
-        substitute_keys(dict_to_process=user, base_keys=from_db)
-        return user

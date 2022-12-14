@@ -27,6 +27,7 @@ def authenticate(func):
     def result_auth(*args, **kwargs):
         try:
             request = args[0]
+            logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']
@@ -55,6 +56,7 @@ def authenticate_class(func):
         try:
             instance = args[0]
             request = args[1]
+            logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             user_id = request.headers['authorization']

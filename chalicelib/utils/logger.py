@@ -9,33 +9,36 @@ from time import mktime, struct_time
 from chalice.app import Request
 
 
-class AggregatorLogger(Logger):
+class CustomLogger(Logger):
 
     def __init__(self, name, level=NOTSET):
         self.current_request_id = None
-        super(AggregatorLogger, self).__init__(name, level)
+        super(CustomLogger, self).__init__(name, level)
 
     def __change_msg(self, msg):
         return f'[{self.current_request_id}] : {msg}'
 
     def debug(self, msg, *args, **kwargs):
-        super(AggregatorLogger, self).debug(self.__change_msg(msg), *args, **kwargs)
+        super(CustomLogger, self).debug(self.__change_msg(msg), *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
-        super(AggregatorLogger, self).info(self.__change_msg(msg), *args, **kwargs)
+        super(CustomLogger, self).info(self.__change_msg(msg), *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        super(CustomLogger, self).warning(self.__change_msg(msg), *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
-        super(AggregatorLogger, self).error(self.__change_msg(msg), *args, **kwargs)
+        super(CustomLogger, self).error(self.__change_msg(msg), *args, **kwargs)
 
     def log(self, level, msg, *args, **kwargs):
-        super(AggregatorLogger, self).log(level, self.__change_msg(msg), *args, **kwargs)
+        super(CustomLogger, self).log(level, self.__change_msg(msg), *args, **kwargs)
 
     def exception(self, msg, *args, exc_info=True, **kwargs):
-        super(AggregatorLogger, self).exception(self.__change_msg(msg), *args, exc_info=exc_info, **kwargs)
+        super(CustomLogger, self).exception(self.__change_msg(msg), *args, exc_info=exc_info, **kwargs)
 
 
 def conf_logger(level):
-    setLoggerClass(AggregatorLogger)
+    setLoggerClass(CustomLogger)
     logger_ = getLogger(__name__)
     console_handler = StreamHandler()
     console_handler.setLevel(level)

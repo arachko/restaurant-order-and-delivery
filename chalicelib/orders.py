@@ -3,9 +3,10 @@ from decimal import Decimal
 from typing import Tuple, Any, List
 from uuid import uuid4
 
-from boto3.dynamodb.conditions import Attr, Key
+from boto3.dynamodb.conditions import Key
 from chalice import Response
 
+from chalicelib.base_class_entity import EntityBase
 from chalicelib.carts import Cart
 from chalicelib.constants import keys_structure
 from chalicelib.constants.constants import UNAUTHORIZED_USER
@@ -19,7 +20,7 @@ from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound,
 from chalicelib.utils.logger import logger
 
 
-class PreOrder:
+class PreOrder(EntityBase):
     pk = keys_structure.pre_orders_pk
     sk = keys_structure.pre_orders_sk
 
@@ -45,11 +46,12 @@ class PreOrder:
     }
 
     def __init__(self, id_, user_id, **kwargs):
+        EntityBase.__init__(self, id_)
+
         self.request_data = kwargs.get('request_data', {})
 
         self.menu_item_list: List[MenuItem] = []
 
-        self.id_: str = id_
         self.user_id: str = user_id
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
@@ -61,6 +63,7 @@ class PreOrder:
         self.date_created: str = datetime.today().isoformat(timespec='seconds')
         self.archived: bool = kwargs.get('archived', False)
         self.comment_: str = kwargs.get('comment_')
+        self.record_type = 'pre_order'
 
     @classmethod
     def init_request_create_pre_order_unauthorized_user(cls, request):
@@ -107,16 +110,13 @@ class PreOrder:
     @utils_app.log_start_finish
     def endpoint_create_pre_order(self):
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
-        self.create_pre_order()
-        return Response(status_code=http200, body=self.to_ui())
+        self._create_db_record()
+        return Response(status_code=http200, body=self._to_ui())
 
     def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk.format(user_id=self.user_id), self.sk.format(order_id=self.id_)
 
-    def _get_db_item(self):
-        return utils_db.get_db_item(*self._get_pk_sk())
-
-    def to_dict(self):
+    def _to_dict(self):
         return {
             'id_': self.id_,
             'user_id': self.user_id,
@@ -132,17 +132,21 @@ class PreOrder:
             "comment_": self.comment_
         }
 
+    def to_dict(self):
+        return self._to_dict()
+
     def _init_db_record(self):
         pk, sk = self._get_pk_sk()
         self.db_record = {
             'partkey': pk,
             'sortkey': sk,
+            'record_type': self.record_type,
             'ttl_': int((datetime.today() + timedelta(days=1)).timestamp()),
-            **self.to_dict()
+            **self._to_dict()
         }
         substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
 
-    def validate_mandatory_fields(self):
+    def _validate_mandatory_fields(self):
         logger.info(f"validate_mandatory_fields ::: started")
         for key, validator_func in {
             **self.required_immutable_fields_validation,
@@ -154,33 +158,33 @@ class PreOrder:
                 raise exceptions.ValidationException(message)
         logger.info(f"validate_mandatory_fields ::: finished")
 
-    def calculate_amount(self):
+    def _calculate_amount(self):
         self.delivery_price = Restaurant.init_get_by_id(self.restaurant_id).get_delivery_price(self.delivery_address)
         self.amount = Decimal(sum([item.price for item in self.menu_item_list])) + self.delivery_price.quantize(Decimal('1.00'))
 
-    def check_items_availability(self):
+    def _check_items_availability(self):
         # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.item_ids]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
             raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
                                            'them from cart and recreate the order')
 
-    def create_pre_order(self):
-        self.calculate_amount()
+    def _create_db_record(self):
+        self._calculate_amount()
         self._init_db_record()
-        self.validate_mandatory_fields()
-        self.check_items_availability()
+        self._validate_mandatory_fields()
+        self._check_items_availability()
         utils_db.put_db_record(self.db_record)
         logger.info(f"create_pre_order ::: pre_order {self.id_} successfully created")
 
-    def to_ui(self):
-        pre_order = self.to_dict()
-        pre_order['items'] = [item.to_ui() for item in self.menu_item_list]
-        substitute_keys(dict_to_process=pre_order, base_keys=from_db)
-        return pre_order
+    def _to_ui(self):
+        item = self._to_dict()
+        item['items'] = [item._to_ui() for item in self.menu_item_list]
+        substitute_keys(dict_to_process=item, base_keys=from_db)
+        return item
 
 
-class Order:
+class Order(EntityBase):
     pk = keys_structure.orders_pk
     sk = keys_structure.orders_sk
 
@@ -220,12 +224,13 @@ class Order:
     }
 
     def __init__(self, id_, user_id, **kwargs):
+        EntityBase.__init__(self, id_)
+
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
         self.pre_order: Any[PreOrder, None] = None
         self.menu_item_list: List[MenuItem] = []
 
-        self.id_: str = id_
         self.user_id: str = user_id or UNAUTHORIZED_USER
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
@@ -244,6 +249,7 @@ class Order:
         self.archived: bool = kwargs.get('archived', False)
         self.feedback: str = kwargs.get('feedback')
         self.feedback_rate: Any[Decimal, None] = kwargs.get('feedback_rate', None)
+        self.record_type = 'order'
 
     @classmethod
     @utils_auth.authenticate_class
@@ -257,7 +263,7 @@ class Order:
         request_body = utils_data.parse_raw_body(request)
         id_ = request_body['pre_order_id']
         c = cls(id_, user_id)
-        c.init_by_pre_order()
+        c._init_by_pre_order()
         return c
 
     @classmethod
@@ -277,18 +283,19 @@ class Order:
     @utils_app.log_start_finish
     def endpoint_create_order(self):
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
-        self.create_order()
-        Cart.init_by_user_id(user_id=self.user_id).delete_db_record()
-        return Response(status_code=http200, body=self.to_ui())
+        self._create_db_record()
+        if self.user_id != UNAUTHORIZED_USER:
+            Cart.init_by_user_id(user_id=self.user_id).delete_db_record()
+        return Response(status_code=http200, body=self._to_ui())
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_get_by_id(self):
         self.__init__(**self._get_db_item_by_user_gsi())
         self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
-        return Response(status_code=http200, body=self.to_ui())
+        return Response(status_code=http200, body=self._to_ui())
 
-    def init_by_pre_order(self):
+    def _init_by_pre_order(self):
         self.pre_order = PreOrder.init_by_db_record(self.id_, self.user_id)
         pre_order_dict = self.pre_order.to_dict()
         del pre_order_dict['date_created']
@@ -315,7 +322,7 @@ class Order:
         else:
             return orders[0]
 
-    def to_dict(self):
+    def _to_dict(self):
         return {
             'id_': self.id_,
             'user_id': self.user_id,
@@ -344,11 +351,12 @@ class Order:
             'sortkey': sk,
             'gsi_user_orders_partkey': pk_gsi_user_orders,
             'gsi_user_orders_sortkey': sk_gsi_user_orders,
-            **self.to_dict()
+            'record_type': self.record_type,
+            **self._to_dict()
         }
         substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
 
-    def validate_mandatory_fields(self):
+    def _validate_mandatory_fields(self):
         logger.info(f"validate_mandatory_fields ::: started")
         for key, validator_func in {
             **self.required_immutable_fields_validation,
@@ -360,25 +368,28 @@ class Order:
                 raise exceptions.ValidationException(message)
         logger.info(f"validate_mandatory_fields ::: finished")
 
-    def check_items_availability(self):
+    def _check_items_availability(self):
         # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.item_ids]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
             raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
                                            'them from cart and recreate the order')
 
-    def create_order(self):
+    def _create_db_record(self):
         self._init_db_record()
-        self.validate_mandatory_fields()
-        self.check_items_availability()
+        self._validate_mandatory_fields()
+        self._check_items_availability()
         utils_db.put_db_record(self.db_record)
         logger.info(f"create_order ::: order {self.id_} successfully created")
 
+    def _to_ui(self):
+        item = self._to_dict()
+        item['items'] = [item._to_ui() for item in self.menu_item_list]
+        substitute_keys(dict_to_process=item, base_keys=from_db)
+        return item
+
     def to_ui(self):
-        order = self.to_dict()
-        order['items'] = [item.to_ui() for item in self.menu_item_list]
-        substitute_keys(dict_to_process=order, base_keys=from_db)
-        return order
+        return self._to_ui()
 
 
 def get_conditions_user(user_id):
