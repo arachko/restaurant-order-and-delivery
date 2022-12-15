@@ -39,11 +39,27 @@ def test_auth(auth_request):
                 AuthRoute(path=f'/menu-items/{UUID_PATTERN}/{UUID_PATTERN}', methods=['PUT', 'DELETE']),
                 AuthRoute(path=f'/orders', methods=['GET']),
                 AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
-                AuthRoute(path=f'/orders/archived/*', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/{UUID_PATTERN}', methods=['GET']),
                 AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['PUT', 'DELETE']),
                 AuthRoute(path=f'/image-upload', methods=['POST'])
             ],
             principal_id='restaurant_manager'
+        )
+    elif user.role == 'company_admin':
+        return AuthResponse(
+            routes=[
+                AuthRoute(path=f'/restaurants', methods=['GET', 'POST']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
+                AuthRoute(path=f'/menu-items/{UUID_PATTERN}', methods=['GET', 'POST']),
+                AuthRoute(path=f'/menu-items/{UUID_PATTERN}/{UUID_PATTERN}', methods=['PUT', 'DELETE']),
+                AuthRoute(path=f'/orders', methods=['GET']),
+                AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['PUT', 'DELETE']),
+                AuthRoute(path=f'/image-upload', methods=['POST'])
+            ],
+            principal_id='company_admin'
         )
     elif user.role == 'admin':
         return AuthResponse(
@@ -53,8 +69,8 @@ def test_auth(auth_request):
                 AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
                 AuthRoute(path=f'/orders/restaurant/{UUID_PATTERN}', methods=['GET']),
                 AuthRoute(path=f'/orders/user/{UUID_PATTERN}', methods=['GET']),
-                AuthRoute(path=f'/orders/archived/restaurant/*/*', methods=['GET']),
-                AuthRoute(path=f'/orders/archived/user/*/*', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/restaurant/{UUID_PATTERN}/{UUID_PATTERN}', methods=['GET']),
+                AuthRoute(path=f'/orders/archived/user/{UUID_PATTERN}/{UUID_PATTERN}', methods=['GET']),
                 AuthRoute(path=f'/orders/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['DELETE'])
             ],
             principal_id='admin'
