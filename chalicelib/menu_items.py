@@ -153,3 +153,5 @@ class MenuItem(EntityBase):
             if self.db_record.get(key) is not None and validator_func(self.db_record.get(key)) is False:
                 self.raise_validation_error(key)
 
+    def to_ui(self):
+        return self._to_ui()

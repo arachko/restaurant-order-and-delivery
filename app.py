@@ -114,9 +114,9 @@ def get_cart():
     return carts.Cart.init_endpoint(app.current_request).endpoint_get_cart()
 
 
-@app.route('/carts/{restaurant_id}/{menu_item_id}', methods=['POST'], authorizer=test_auth, cors=True)
-def add_item_to_cart(restaurant_id, menu_item_id):
-    return carts.Cart.init_endpoint(app.current_request).endpoint_add_item_to_cart(restaurant_id, menu_item_id)
+@app.route('/carts', methods=['POST'], authorizer=test_auth, cors=True)
+def add_item_to_cart():
+    return carts.Cart.init_endpoint(app.current_request).endpoint_add_item_to_cart()
 
 
 @app.route('/carts/{menu_item_id}', methods=['DELETE'], authorizer=test_auth, cors=True)

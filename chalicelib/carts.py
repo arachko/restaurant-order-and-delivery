@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, List, Dict, Any
 
 from chalice import Response
 
@@ -21,25 +21,29 @@ class Cart(EntityBase):
     }
 
     required_mutable_fields_validation = {
-        'item_ids': lambda x: isinstance(x, list),
+        'menu_items': lambda x: isinstance(x, dict),
         'delivery_address': lambda x: isinstance(x, str)
     }
 
-    def __init__(self, id_, address=None):
+    def __init__(self, id_, request_body=None):
         EntityBase.__init__(self, id_)
 
-        self.db_record: dict = {}
-        self.restaurant_id = None
-        self.delivery_address = address
-        self.item_ids = []
-        self.record_type = 'cart'
+        if request_body is None:
+            request_body = {}
+
+        self.request_body = request_body
+        self.db_record: Dict = {}
+        self.restaurant_id: Any[str, None] = None
+        self.delivery_address = request_body.get('address', None)
+        self.menu_items: Dict = {}
+        self.record_type: str = 'cart'
 
     def _fill_db_item(self):
         try:
             self.db_record = self._get_db_item()
             self.restaurant_id = self.db_record.get('restaurant_id')
             self.delivery_address = self.db_record.get('delivery_address')
-            self.item_ids = self.db_record.get('item_ids')
+            self.menu_items = self.db_record.get('menu_items')
         except RecordNotFound:
             self._init_db_record()
 
@@ -55,7 +59,7 @@ class Cart(EntityBase):
         logger.info("init_request_cart ::: started")
         return cls(
             id_=request.to_dict().get('auth_result', {}).get('user_id'),
-            address=utils_data.parse_raw_body(request).get('address', None)
+            request_body=utils_data.parse_raw_body(request)
         )
 
     @utils_app.request_exception_handler
@@ -66,22 +70,27 @@ class Cart(EntityBase):
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
-    def endpoint_add_item_to_cart(self, restaurant_id, menu_item_id):
+    def endpoint_add_item_to_cart(self):
         self._fill_db_item()
-        if restaurant_id != self.restaurant_id:
-            self.restaurant_id = restaurant_id
+        qty = self.request_body.get('qty')
+        request_restaurant_id = self.request_body.get('restaurant_id')
+        menu_item_id = self.request_body.get('menu_item_id')
+        if request_restaurant_id != self.restaurant_id:
+            self.restaurant_id = request_restaurant_id
             self._create_db_record()
-        self.item_ids.append(menu_item_id)
+        self.menu_items[menu_item_id] = {'id': menu_item_id, 'qty': qty}
         all_items_available: bool = self._check_and_update_available_items()
         self._update_db_record()
-        notice_to_ui = 'Some items are not longer available and were deleted from the cart' if not all_items_available else None
-        return Response(status_code=http200, body={'cart': self._to_ui(), 'message': notice_to_ui})
+        ui_message = None
+        if not all_items_available:
+            ui_message = 'Some items in your cart are not longer available and were deleted from the cart'
+        return Response(status_code=http200, body={'cart': self._to_ui(), 'message': ui_message})
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_remove_item_from_cart(self, menu_item_id):
         self._fill_db_item()
-        self.item_ids.remove(menu_item_id)
+        self.menu_items.pop(menu_item_id)
         self._update_db_record()
         return Response(status_code=http200, body={'cart': self._to_ui()})
 
@@ -99,14 +108,14 @@ class Cart(EntityBase):
             'id_': self.id_,
             'restaurant_id': self.restaurant_id,
             'delivery_address': self.delivery_address,
-            'item_ids': self.item_ids
+            'menu_items': self.menu_items
         }
 
     def _check_and_update_available_items(self) -> bool:
-        items_num = len(self.item_ids)
-        self.item_ids = [item_id for item_id in self.item_ids if
-                         MenuItem.init_get_by_id(item_id, self.restaurant_id).is_available]
-        return True if items_num == len(self.item_ids) else False
+        items_qnt = len(self.menu_items)
+        self.menu_items = {item_id: info for item_id, info in self.menu_items.items() if
+                           MenuItem.init_get_by_id(item_id, self.restaurant_id).is_available}
+        return True if items_qnt == len(self.menu_items) else False
 
     def delete_db_record(self):
         pk, sk = self._get_pk_sk()

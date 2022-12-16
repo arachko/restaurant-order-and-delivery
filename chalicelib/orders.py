@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Tuple, Any, List
+from typing import Tuple, Any, List, Dict
 from uuid import uuid4
 
 from boto3.dynamodb.conditions import Key
@@ -33,7 +33,7 @@ class PreOrder(EntityBase):
     }
 
     required_mutable_fields_validation = {
-        'item_ids': lambda x: isinstance(x, list),
+        'menu_items': lambda x: isinstance(x, dict),
         'amount': lambda x: isinstance(x, Decimal),
         'delivery_address': lambda x: isinstance(x, str),
         'delivery_price': lambda x: isinstance(x, Decimal),
@@ -56,7 +56,7 @@ class PreOrder(EntityBase):
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
         self.restaurant_id: str = kwargs.get('restaurant_id')
-        self.item_ids: list = kwargs.get('item_ids', [])
+        self.menu_items: Dict = kwargs.get('menu_items', {})
         self.delivery_address: str = kwargs.get('delivery_address')
         self.delivery_price: Decimal = kwargs.get('delivery_price')
         self.amount: Decimal = kwargs.get('amount')
@@ -75,7 +75,7 @@ class PreOrder(EntityBase):
             user_id=UNAUTHORIZED_USER,
             restaurant_id=request_body['restaurant_id'],
             delivery_address=request_body['delivery_address'],
-            item_ids=request_body['item_ids'],
+            menu_items=request_body['menu_items'],
             user_phone_number=request_body['user_phone_number'],
             user_email=request_body.get('user_email'),
             comment_=request_body.get('comment_')
@@ -94,7 +94,7 @@ class PreOrder(EntityBase):
             user_id=request.to_dict().get('auth_result', {}).get('user_id'),
             restaurant_id=cart.restaurant_id,
             delivery_address=request_body['delivery_address'],
-            item_ids=cart.item_ids,
+            menu_items=cart.menu_items,
             user_phone_number=request_body['user_phone_number'],
             user_email=request_body.get('user_email'),
             comment_=request_body.get('comment_')
@@ -109,7 +109,10 @@ class PreOrder(EntityBase):
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_create_pre_order(self):
-        self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
+        for item in self.menu_items.values():
+            menu_item: MenuItem = MenuItem.init_get_by_id(item['id'], self.restaurant_id)
+            self.menu_item_list.append(menu_item)
+            item['details'] = menu_item.to_ui()
         self._create_db_record()
         return Response(status_code=http200, body=self._to_ui())
 
@@ -126,7 +129,7 @@ class PreOrder(EntityBase):
             'delivery_address': self.delivery_address,
             'delivery_price': self.delivery_price,
             'date_created': self.date_created,
-            'item_ids': self.item_ids,
+            'menu_items': self.menu_items,
             'amount': self.amount,
             'archived': self.archived,
             "comment_": self.comment_
@@ -160,10 +163,12 @@ class PreOrder(EntityBase):
 
     def _calculate_amount(self):
         self.delivery_price = Restaurant.init_get_by_id(self.restaurant_id).get_delivery_price(self.delivery_address)
-        self.amount = Decimal(sum([item.price for item in self.menu_item_list])) + self.delivery_price.quantize(Decimal('1.00'))
+        self.amount = Decimal(
+            sum([item['details']['price'] * item['qty'] for item in self.menu_items.values()])
+        ) + self.delivery_price.quantize(Decimal('1.00'))
 
     def _check_items_availability(self):
-        # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.item_ids]
+        # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.menu_items]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
             raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
@@ -176,12 +181,6 @@ class PreOrder(EntityBase):
         self._check_items_availability()
         utils_db.put_db_record(self.db_record)
         logger.info(f"create_pre_order ::: pre_order {self.id_} successfully created")
-
-    def _to_ui(self):
-        item = self._to_dict()
-        item['items'] = [item._to_ui() for item in self.menu_item_list]
-        substitute_keys(dict_to_process=item, base_keys=from_db)
-        return item
 
 
 class Order(EntityBase):
@@ -207,7 +206,7 @@ class Order(EntityBase):
     }
 
     required_mutable_fields_validation = {
-        'item_ids': lambda x: isinstance(x, list),
+        'menu_items': lambda x: isinstance(x, dict),
         'amount': lambda x: isinstance(x, Decimal),
         'delivery_address': lambda x: isinstance(x, str),
         'delivery_price': lambda x: isinstance(x, Decimal),
@@ -235,7 +234,7 @@ class Order(EntityBase):
         self.user_phone_number: str = kwargs.get('user_phone_number')
         self.user_email: str = kwargs.get('user_email')
         self.restaurant_id: str = kwargs.get('restaurant_id')
-        self.item_ids: list = kwargs.get('item_ids', [])
+        self.menu_items: dict = kwargs.get('menu_items', {})
         self.delivery_address: str = kwargs.get('delivery_address')
         self.delivery_price: str = kwargs.get('delivery_price')
         self.amount: Decimal = Decimal(kwargs.get('amount')).quantize(Decimal('1.00')) if \
@@ -279,10 +278,14 @@ class Order(EntityBase):
         user_id = request.to_dict().get('auth_result', {}).get('user_id')
         return cls.init_create_order(request, user_id)
 
+    def fill_items_details(self):
+        for item in self.menu_items.values():
+            item['details'] = MenuItem.init_get_by_id(item['id'], self.restaurant_id).to_ui()
+
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_create_order(self):
-        self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
+        self.fill_items_details()
         self._create_db_record()
         if self.user_id != UNAUTHORIZED_USER:
             Cart.init_by_user_id(user_id=self.user_id).delete_db_record()
@@ -292,7 +295,7 @@ class Order(EntityBase):
     @utils_app.log_start_finish
     def endpoint_get_by_id(self):
         self.__init__(**self._get_db_item_by_user_gsi())
-        self.menu_item_list = [MenuItem.init_get_by_id(item, self.restaurant_id) for item in self.item_ids]
+        self.fill_items_details()
         return Response(status_code=http200, body=self._to_ui())
 
     def _init_by_pre_order(self):
@@ -332,7 +335,7 @@ class Order(EntityBase):
             'delivery_address': self.delivery_address,
             'delivery_price': self.delivery_price,
             'date_created': self.date_created,
-            'item_ids': self.item_ids,
+            'menu_items': self.menu_items,
             'amount': self.amount,
             'paid': self.paid,
             "history": self.history,
@@ -369,7 +372,7 @@ class Order(EntityBase):
         logger.info(f"validate_mandatory_fields ::: finished")
 
     def _check_items_availability(self):
-        # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.item_ids]
+        # self.menu_item_list = [MenuItem.init_get_by_id(item['id'], self.restaurant_id) for item in self.menu_items]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
             raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '

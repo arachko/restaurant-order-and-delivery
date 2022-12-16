@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from typing import List
 
 import pytest as pytest
 
@@ -80,11 +81,14 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
     return id_, id_2
 
 
-def add_test_items_to_cart(chalice_gateway, restaurant_id, item_ids: list, request):
-
-    for item_id in item_ids:
-        response = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}/{item_id}",
-                                method="POST", token=id_user)
+def add_test_items_to_cart(chalice_gateway, restaurant_id, menu_items: List[List], request):
+    for item in menu_items:
+        req_body = {
+            'restaurant_id': restaurant_id,
+            'menu_item_id': item[0],
+            'qty': item[1]
+        }
+        response = make_request(chalice_gateway, endpoint=f"/carts", json_body=req_body, method="POST", token=id_user)
         assert response['statusCode'] == 200
 
     def resource_teardown_menu_items():
@@ -95,13 +99,17 @@ def add_test_items_to_cart(chalice_gateway, restaurant_id, item_ids: list, reque
     request.addfinalizer(resource_teardown_menu_items)
 
 
-def create_test_pre_order_unauthorized_user(chalice_gateway, restaurant_id, menu_item_to_order_1, menu_item_to_order_2, request):
+def create_test_pre_order_unauthorized_user(chalice_gateway, restaurant_id, menu_item_to_order_1,
+                                            menu_item_to_order_2, request):
     order_data = {
         'user_phone_number': '+79216146600',
         'user_email': 'rachko.a@gmail.com',
         'restaurant_id': restaurant_id,
         'delivery_address': 'Mayskiy lane, 2, flat 119',
-        'item_ids': [menu_item_to_order_1, menu_item_to_order_2],
+        'menu_items': {
+            menu_item_to_order_1: {'id': menu_item_to_order_1, 'qty': 2},
+            menu_item_to_order_2: {'id': menu_item_to_order_2, 'qty': 1}
+        },
         'comment': 'Please deliver my order ASAP'
     }
 
@@ -186,7 +194,10 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
         'user_email': 'rachko.a@gmail.com',
         'restaurant_id': restaurant_id,
         'delivery_address': 'Mayskiy lane, 2, flat 119',
-        'item_ids': [menu_item_id, menu_item_id_2],
+        'menu_items': {
+            menu_item_id: {'id': menu_item_id, 'qty': 2},
+            menu_item_id_2: {'id': menu_item_id_2, 'qty': 1}
+        },
         'comment': 'Please deliver my order ASAP'
     }
 
@@ -210,8 +221,8 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 38.48
     assert response_body['archived'] is False
     assert response_body['comment'] == 'Please deliver my order ASAP'
 
@@ -247,8 +258,8 @@ def test_create_order_unauthorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 38.48
     assert response_body['paid'] is False
     assert response_body['history'] == ['created']
     assert response_body['archived'] is False
@@ -281,8 +292,8 @@ def test_get_order_by_id_unauthorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 38.48
     assert response_body['paid'] is False
     assert response_body['history'] == ['created']
     assert response_body['archived'] is False
@@ -294,7 +305,7 @@ def test_get_order_by_id_unauthorized_user(chalice_gateway, request):
 def test_create_pre_order_authorized_user(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
     menu_item_id, menu_item_id_2 = create_test_menu_items(chalice_gateway, restaurant_id, request)
-    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id, menu_item_id_2], request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [[menu_item_id, 1], [menu_item_id_2, 2]], request)
 
     request_body = {
         'user_phone_number': '+79216146600',
@@ -321,8 +332,8 @@ def test_create_pre_order_authorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 46.99
     assert response_body['comment'] == 'Please deliver my order ASAP'
 
 
@@ -330,7 +341,7 @@ def test_create_pre_order_authorized_user(chalice_gateway, request):
 def test_create_order_authorized_user(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
     menu_item_id, menu_item_id_2 = create_test_menu_items(chalice_gateway, restaurant_id, request)
-    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id, menu_item_id_2], request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [[menu_item_id, 2], [menu_item_id_2, 1]], request)
     pre_order_id = create_test_pre_order_authorized_user(chalice_gateway, request)
 
     response = make_request(chalice_gateway, endpoint=f"/orders", json_body={'pre_order_id': pre_order_id},
@@ -352,8 +363,8 @@ def test_create_order_authorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 38.48
     assert response_body['paid'] is False
     assert response_body['history'] == ['created']
     assert response_body['archived'] is False
@@ -365,7 +376,7 @@ def test_create_order_authorized_user(chalice_gateway, request):
 def test_get_order_by_id_authorized_user(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
     menu_item_id, menu_item_id_2 = create_test_menu_items(chalice_gateway, restaurant_id, request)
-    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id, menu_item_id_2], request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [[menu_item_id, 1], [menu_item_id_2, 2]], request)
     pre_order_id = create_test_pre_order_authorized_user(chalice_gateway, request)
     order_id = create_test_order_authorized_user(chalice_gateway, pre_order_id, restaurant_id, request)
 
@@ -382,8 +393,8 @@ def test_get_order_by_id_authorized_user(chalice_gateway, request):
     assert response_body['user_email'] == 'rachko.a@gmail.com'
     assert response_body['restaurant_id'] == restaurant_id
     assert response_body['delivery_address'] == 'Mayskiy lane, 2, flat 119'
-    assert len(response_body['item_ids']) == 2
-    assert response_body['amount'] == 28.49
+    assert len(response_body['menu_items']) == 2
+    assert response_body['amount'] == 46.99
     assert response_body['paid'] is False
     assert response_body['history'] == ['created']
     assert response_body['archived'] is False
@@ -395,10 +406,10 @@ def get_orders_base(chalice_gateway, request, url, token, restaurant_id=None):
     if not restaurant_id:
         restaurant_id = create_test_restaurant(chalice_gateway, request)
     menu_item_id, menu_item_id_2 = create_test_menu_items(chalice_gateway, restaurant_id, request)
-    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id], request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [[menu_item_id, 1]], request)
     pre_order_id = create_test_pre_order_authorized_user(chalice_gateway, request)
     order_id = create_test_order_authorized_user(chalice_gateway, pre_order_id, restaurant_id, request)
-    add_test_items_to_cart(chalice_gateway, restaurant_id, [menu_item_id_2], request)
+    add_test_items_to_cart(chalice_gateway, restaurant_id, [[menu_item_id_2, 2]], request)
     pre_order_id_2 = create_test_pre_order_authorized_user(chalice_gateway, request)
     order_id_2 = create_test_order_authorized_user(chalice_gateway, pre_order_id_2, restaurant_id, request)
 
@@ -410,7 +421,7 @@ def get_orders_base(chalice_gateway, request, url, token, restaurant_id=None):
     assert response_body[0]['id'] != response_body[1]['id']
     for id_ in [order_id, order_id_2]:
         assert id_ in [response_body[0]['id'], response_body[1]['id']]
-    for amount in [9.99, 18.50]:
+    for amount in [9.99, 37.0]:
         assert amount in [response_body[0]['amount'], response_body[1]['amount']]
 
 
