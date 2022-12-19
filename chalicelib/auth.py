@@ -1,15 +1,32 @@
+from typing import Dict, Any
+
 from chalice import AuthResponse, AuthRoute
+from chalice.app import AuthRequest, ChaliceAuthorizer
 
 from chalicelib.users import User
+from chalicelib.utils.auth import get_company_id_by_host
 from chalicelib.utils.exceptions import AuthorizationException
 
 UUID_PATTERN = '????????-????-4???-????-????????????'
 ORDER_ID_PATTERN = '????????'
 
 
+class CustomAuthRequest(AuthRequest):
+    def __init__(self, auth_type: str, token: str, method_arn: str, request_host: str) -> None:
+        AuthRequest.__init__(self, auth_type, token, method_arn)
+        self.request_host: str = request_host
+
+
+class MonsterAuthorizer(ChaliceAuthorizer):
+    def _transform_event(self, event: Dict[str, Any]) -> CustomAuthRequest:
+        return CustomAuthRequest(event['type'], event['authorizationToken'],
+                                 event['methodArn'], event.get('headers').get('host'))
+
+
 def role_authorizer(auth_request):
     user_id = auth_request.token
-    user: User = User.init_by_id(user_id)
+    company_id = get_company_id_by_host(auth_request.request_host)
+    user: User = User.init_by_id(company_id, user_id)
     if user.role == 'user':
         return AuthResponse(
             routes=[

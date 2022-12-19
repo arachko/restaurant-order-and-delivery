@@ -3,7 +3,6 @@ import copy
 import os
 from io import BytesIO
 from typing import Tuple
-from uuid import uuid4
 
 from chalice import Response
 

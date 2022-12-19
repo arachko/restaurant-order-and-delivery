@@ -15,7 +15,8 @@ class EntityBase:
     required_mutable_fields_validation = {}
     optional_fields_validation = {}
 
-    def __init__(self, id_):
+    def __init__(self, company_id, id_):
+        self.company_id = company_id
         self.id_: str = id_
         self.record_type: str = ''
         self.request_data: Any[Dict, None] = None
@@ -52,6 +53,7 @@ class EntityBase:
         self.db_record = {
             'partkey': pk,
             'sortkey': sk,
+            'company_id': self.company_id,
             'record_type': self.record_type,
             **self._to_dict()
         }

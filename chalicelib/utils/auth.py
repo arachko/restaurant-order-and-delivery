@@ -4,6 +4,7 @@ import jwt
 import json
 
 from chalice import Response
+from chalice.app import Request
 
 # from chalicelib.constants.auth import COGNITO_JWK_URL, COGNITO_IDP_URL
 from chalicelib.constants import status_codes, keys_structure
@@ -11,10 +12,27 @@ from chalicelib.utils import exceptions as utils_exceptions, db as utils_db
 from chalicelib.utils.app import error_response
 from chalicelib.utils.logger import log_request, logger, log_exception
 
+host_company_id_map = {
+    'test-domain.com': 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a',
+    '127.0.0.1:8000': 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
+}
 
-def get_user_role(user_id):
+
+def get_company_id_by_host(host: str):
+    try:
+        return host_company_id_map[host]
+    except Exception as error:
+        logger.exception(f'Error occurred while trying to get company id by {host=}, {error=}')
+        raise Exception(f'Unknown domain {host}')
+
+
+def get_company_id_by_request(request: Request):
+    return get_company_id_by_host(request.headers['host'])
+
+
+def get_user_role(company_id, user_id):
     return utils_db.get_db_item(
-        partkey=keys_structure.users_pk,
+        partkey=keys_structure.users_pk.format(company_id=company_id),
         sortkey=keys_structure.users_sk.format(user_id=user_id)
     ).get('role')
 
@@ -30,9 +48,9 @@ def authenticate(func):
             logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
+            company_id = get_company_id_by_request(request)
             user_id = request.headers['authorization']
-            user_role = get_user_role(user_id)
-            company_id = 'aee9d9e6-eb8d-4105-b805-6937d6d6700f'
+            user_role = get_user_role(company_id, user_id)
             if user_id:
                 setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
                 result = func(*args, **kwargs)
@@ -59,9 +77,9 @@ def authenticate_class(func):
             logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
+            company_id = get_company_id_by_request(request)
             user_id = request.headers['authorization']
-            user_role = get_user_role(user_id)
-            company_id = 'aee9d9e6-eb8d-4105-b805-6937d6d6700f'
+            user_role = get_user_role(company_id, user_id)
             if user_id:
                 setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
                 setattr(instance, 'user_id', user_id)

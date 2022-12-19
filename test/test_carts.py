@@ -6,6 +6,7 @@ import pytest as pytest
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import db
+from chalicelib.utils.auth import host_company_id_map
 from test.utils.request_utils import make_request
 
 from test.utils.fixtures import chalice_gateway
@@ -18,8 +19,10 @@ id_admin = '13303309-d941-486f-b600-3e90929ac50f'
 id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
 id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
 
+test_company_id = host_company_id_map['test-domain.com']
 
-def create_test_restaurant(chalice_gateway):
+
+def create_test_restaurant(chalice_gateway, request):
     restaurant_to_create = {
         'title': 'test restaurant title',
         'address': 'Time Square, New York',
@@ -31,12 +34,18 @@ def create_test_restaurant(chalice_gateway):
     response = make_request(chalice_gateway, endpoint="/restaurants", method="POST",
                             json_body=restaurant_to_create, token=id_admin)
     id_ = json.loads(response["body"])["id"]
-    pk = keys_structure.restaurants_pk
-    sk = keys_structure.restaurants_sk.format(restaurant_id=id_)
-    return id_, pk, sk
+
+    def resource_teardown():
+        db.get_gen_table().delete_item(Key={
+            'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
+            'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
+        })
+    request.addfinalizer(resource_teardown)
+
+    return id_
 
 
-def create_test_menu_item(chalice_gateway, restaurant_id):
+def create_test_menu_item(chalice_gateway, restaurant_id, request):
     menu_item_to_create = {
         'title': 'test title',
         'category': 'breakfast',
@@ -47,9 +56,34 @@ def create_test_menu_item(chalice_gateway, restaurant_id):
                             json_body=menu_item_to_create, token=id_restaurant_manager)
 
     id_ = json.loads(response["body"])["id"]
-    pk = keys_structure.menu_items_pk.format(restaurant_id=restaurant_id)
-    sk = keys_structure.menu_items_sk.format(menu_item_id=id_)
-    return id_, pk, sk
+
+    def resource_teardown():
+        db.get_gen_table().delete_item(Key={
+            'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
+            'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
+        })
+    request.addfinalizer(resource_teardown)
+
+    return id_
+
+
+def add_test_item_to_cart(chalice_gateway, restaurant_id, menu_item_id, request):
+    req_body = {
+        'restaurant_id': restaurant_id,
+        'menu_item_id': menu_item_id,
+        'qty': 3
+    }
+
+    response = make_request(chalice_gateway, endpoint=f"/carts", json_body=req_body, method="POST", token=id_user)
+
+    assert response['statusCode'] == http200, f"status code not as expected"
+
+    carts_pk, carts_sk = keys_structure.carts_pk.format(company_id=test_company_id), \
+        keys_structure.carts_sk.format(user_id=id_user)
+
+    def resource_teardown():
+        db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
+    request.addfinalizer(resource_teardown)
 
 
 @pytest.mark.local_db_test
@@ -67,10 +101,11 @@ def test_get_cart(chalice_gateway, request):
 
 @pytest.mark.local_db_test
 def test_add_item_to_cart(chalice_gateway, request):
-    restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
-    menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
+    restaurant_id = create_test_restaurant(chalice_gateway, request)
+    menu_item_id = create_test_menu_item(chalice_gateway, restaurant_id, request)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
+    carts_pk, carts_sk = keys_structure.carts_pk.format(company_id=test_company_id), \
+        keys_structure.carts_sk.format(user_id=id_user)
 
     req_body = {
         'restaurant_id': restaurant_id,
@@ -83,8 +118,6 @@ def test_add_item_to_cart(chalice_gateway, request):
     assert response['statusCode'] == http200, f"status code not as expected"
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': restaurant_pk, 'sortkey': restaurant_sk})
-        db.get_gen_table().delete_item(Key={'partkey': menu_item_pk, 'sortkey': menu_item_sk})
         db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
     request.addfinalizer(resource_teardown)
 
@@ -109,26 +142,12 @@ def test_add_item_to_cart(chalice_gateway, request):
 
 @pytest.mark.local_db_test
 def test_remove_item_from_cart(chalice_gateway, request):
-    restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
-    menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
+    restaurant_id = create_test_restaurant(chalice_gateway, request)
+    menu_item_id = create_test_menu_item(chalice_gateway, restaurant_id, request)
+    add_test_item_to_cart(chalice_gateway, restaurant_id, menu_item_id, request)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
-
-    req_body = {
-        'restaurant_id': restaurant_id,
-        'menu_item_id': menu_item_id,
-        'qty': 3
-    }
-
-    response = make_request(chalice_gateway, endpoint=f"/carts", json_body=req_body, method="POST", token=id_user)
-
-    assert response['statusCode'] == http200, f"status code not as expected"
-
-    def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': restaurant_pk, 'sortkey': restaurant_sk})
-        db.get_gen_table().delete_item(Key={'partkey': menu_item_pk, 'sortkey': menu_item_sk})
-        db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
-    request.addfinalizer(resource_teardown)
+    carts_pk, carts_sk = keys_structure.carts_pk.format(company_id=test_company_id), \
+        keys_structure.carts_sk.format(user_id=id_user)
 
     def assert_cart_details(assert_dict, from_db=False, menu_items=None):
         if menu_items is None:
@@ -153,26 +172,12 @@ def test_remove_item_from_cart(chalice_gateway, request):
 
 @pytest.mark.local_db_test
 def test_clear_cart(chalice_gateway, request):
-    restaurant_id, restaurant_pk, restaurant_sk = create_test_restaurant(chalice_gateway)
-    menu_item_id, menu_item_pk, menu_item_sk = create_test_menu_item(chalice_gateway, restaurant_id)
+    restaurant_id = create_test_restaurant(chalice_gateway, request)
+    menu_item_id = create_test_menu_item(chalice_gateway, restaurant_id, request)
+    add_test_item_to_cart(chalice_gateway, restaurant_id, menu_item_id, request)
 
-    carts_pk, carts_sk = keys_structure.carts_pk, keys_structure.carts_sk.format(user_id=id_user)
-
-    req_body = {
-        'restaurant_id': restaurant_id,
-        'menu_item_id': menu_item_id,
-        'qty': 3
-    }
-
-    response = make_request(chalice_gateway, endpoint=f"/carts", json_body=req_body, method="POST", token=id_user)
-
-    assert response['statusCode'] == http200, f"status code not as expected"
-
-    def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': restaurant_pk, 'sortkey': restaurant_sk})
-        db.get_gen_table().delete_item(Key={'partkey': menu_item_pk, 'sortkey': menu_item_sk})
-        db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
-    request.addfinalizer(resource_teardown)
+    carts_pk, carts_sk = keys_structure.carts_pk.format(company_id=test_company_id), \
+        keys_structure.carts_sk.format(user_id=id_user)
 
     def assert_cart_details(assert_dict):
         assert assert_dict['id_'] == id_user

@@ -6,6 +6,7 @@ from chalicelib.constants import keys_structure
 from chalicelib.constants.constants import MAIN_IMAGE_NAME, THUMB_IMAGE_NAME
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import db
+from chalicelib.utils.auth import host_company_id_map
 from test.utils.request_utils import make_request
 from chalicelib.utils.boto_clients import s3_client
 
@@ -16,6 +17,8 @@ id_restaurant_manager = '8178f948-cdc2-4e8c-b013-07a956e7e72a'
 id_user = 'e5b01491-e538-4be3-8d3c-a57db7fc43c1'
 
 company_id = 'aee9d9e6-eb8d-4105-b805-6937d6d6700f'
+
+test_company_id = host_company_id_map['test-domain.com']
 
 
 def create_test_restaurant(chalice_gateway, request):
@@ -34,7 +37,7 @@ def create_test_restaurant(chalice_gateway, request):
 
     def resource_teardown_rest():
         db.get_gen_table().delete_item(Key={
-            'partkey': keys_structure.restaurants_pk,
+            'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
     request.addfinalizer(resource_teardown_rest)
@@ -56,7 +59,7 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
 
     def resource_teardown_menu_items():
         db.get_gen_table().delete_item(Key={
-            'partkey': keys_structure.menu_items_pk.format(restaurant_id=restaurant_id),
+            'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
     request.addfinalizer(resource_teardown_menu_items)
@@ -77,7 +80,9 @@ def test_put_restaurant_image(chalice_gateway, request):
     response = chalice_gateway.handle_request(
         method='POST',
         path='/image-upload',
-        headers={'Content-Type': multipart_data.content_type, 'Authorization': id_restaurant_manager},
+        headers={'Content-Type': multipart_data.content_type,
+                 'Host': 'test-domain.com',
+                 'Authorization': id_restaurant_manager},
         body=multipart_data.to_string()
     )
 
@@ -110,7 +115,9 @@ def test_put_menu_item_image(chalice_gateway, request):
     response = chalice_gateway.handle_request(
         method='POST',
         path='/image-upload',
-        headers={'Content-Type': multipart_data.content_type, 'Authorization': id_restaurant_manager},
+        headers={'Content-Type': multipart_data.content_type,
+                 'Host': 'test-domain.com',
+                 'Authorization': id_restaurant_manager},
         body=multipart_data.to_string()
     )
 

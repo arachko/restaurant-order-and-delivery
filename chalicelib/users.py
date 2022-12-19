@@ -6,6 +6,7 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import auth as utils_auth, app as utils_app, data as utils_data
+from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.logger import logger
 
 
@@ -33,8 +34,8 @@ class User(EntityBase):
         'additional_phone_numbers': lambda x: isinstance(x, list)
     }
 
-    def __init__(self, id_, **kwargs):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, **kwargs):
+        EntityBase.__init__(self, company_id, id_)
 
         self.login = kwargs.get('login')
         self.phone = kwargs.get('phone', [])
@@ -50,29 +51,27 @@ class User(EntityBase):
         self.record_type = 'user'
 
     @classmethod
-    def init_by_id(cls, id_):
-        c = cls(id_)
+    def init_by_id(cls, company_id, id_):
+        logger.info("init_endpoint ::: started")
+        c = cls(company_id, id_)
         c.__init__(**c._get_db_item())
         return c
 
     @classmethod
     @utils_auth.authenticate_class
-    def init_request(cls, request):
-        return cls.init_by_id(request.to_dict().get('auth_result', {}).get('user_id'))
-
-    @classmethod
-    @utils_auth.authenticate_class
     def init_request_get(cls, request):
         logger.info("init_request_get ::: started")
-        return cls.init_by_id(request.to_dict().get('auth_result', {}).get('user_id'))
+        company_id = get_company_id_by_request(request)
+        return cls.init_by_id(company_id, request.to_dict().get('auth_result', {}).get('user_id'))
 
     @classmethod
     @utils_auth.authenticate_class
     def init_request_update(cls, request):
         logger.info("init_request_update ::: started")
+        company_id = get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
         id_ = request.to_dict().get('auth_result', {}).get('user_id')
-        return cls(id_=id_, **request_body)
+        return cls(company_id=company_id, id_=id_, **request_body)
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
@@ -86,7 +85,7 @@ class User(EntityBase):
         return Response(status_code=http200, body={'message': 'User was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk, self.sk.format(user_id=self.id_)
+        return self.pk.format(company_id=self.company_id), self.sk.format(user_id=self.id_)
 
     def _to_dict(self):
         return {

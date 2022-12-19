@@ -17,6 +17,7 @@ from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.menu_items import MenuItem
 from chalicelib.restaurants import Restaurant
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
+from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.email_templates import get_new_order_notification_message
 from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound, AccessDenied, MissingRestaurantId
@@ -49,8 +50,8 @@ class PreOrder(EntityBase):
         'comment': lambda x: isinstance(x, str)
     }
 
-    def __init__(self, id_, user_id, **kwargs):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, user_id, **kwargs):
+        EntityBase.__init__(self, company_id, id_)
 
         self.request_data = kwargs.get('request_data', {})
 
@@ -72,9 +73,11 @@ class PreOrder(EntityBase):
     @classmethod
     def init_request_create_pre_order_unauthorized_user(cls, request):
         logger.info("init_request_create_pre_order_unauthorized_user ::: started")
+        company_id = get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
         substitute_keys(request_body, to_db)
         return cls(
+            company_id=company_id,
             id_=str(uuid4()).split('-')[0],
             user_id=UNAUTHORIZED_USER,
             restaurant_id=request_body['restaurant_id'],
@@ -89,11 +92,13 @@ class PreOrder(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_pre_order_authorized_user(cls, request):
         logger.info("init_request_create_pre_order_authorized_user ::: started")
+        company_id = get_company_id_by_request(request)
         user_id = request.to_dict().get('auth_result', {}).get('user_id')
-        cart: Cart = Cart.init_by_user_id(user_id)
+        cart: Cart = Cart.init_by_user_id(company_id, user_id)
         request_body = utils_data.parse_raw_body(request)
         substitute_keys(request_body, to_db)
         return cls(
+            company_id=company_id,
             id_=str(uuid4()).split('-')[0],
             user_id=request.to_dict().get('auth_result', {}).get('user_id'),
             restaurant_id=cart.restaurant_id,
@@ -105,8 +110,8 @@ class PreOrder(EntityBase):
         )
 
     @classmethod
-    def init_by_db_record(cls, id_, user_id):
-        c = cls(id_, user_id)
+    def init_by_db_record(cls, company_id, id_, user_id):
+        c = cls(company_id, id_, user_id)
         c.__init__(**c._get_db_item())
         return c
 
@@ -114,18 +119,19 @@ class PreOrder(EntityBase):
     @utils_app.log_start_finish
     def endpoint_create_pre_order(self):
         for item in self.menu_items.values():
-            menu_item: MenuItem = MenuItem.init_get_by_id(item['id'], self.restaurant_id)
+            menu_item: MenuItem = MenuItem.init_get_by_id(self.company_id, item['id'], self.restaurant_id)
             self.menu_item_list.append(menu_item)
             item['details'] = menu_item.to_ui()
         self._create_db_record()
         return Response(status_code=http200, body=self._to_ui())
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk.format(user_id=self.user_id), self.sk.format(order_id=self.id_)
+        return self.pk.format(company_id=self.company_id, user_id=self.user_id), self.sk.format(order_id=self.id_)
 
     def _to_dict(self):
         return {
             'id_': self.id_,
+            'ttl_': int((datetime.today() + timedelta(days=1)).timestamp()),
             'user_id': self.user_id,
             'user_phone_number': self.user_phone_number,
             'user_email': self.user_email,
@@ -142,17 +148,6 @@ class PreOrder(EntityBase):
     def to_dict(self):
         return self._to_dict()
 
-    def _init_db_record(self):
-        pk, sk = self._get_pk_sk()
-        self.db_record = {
-            'partkey': pk,
-            'sortkey': sk,
-            'record_type': self.record_type,
-            'ttl_': int((datetime.today() + timedelta(days=1)).timestamp()),
-            **self._to_dict()
-        }
-        substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
-
     def _validate_mandatory_fields(self):
         logger.info(f"validate_mandatory_fields ::: started")
         for key, validator_func in {
@@ -166,7 +161,8 @@ class PreOrder(EntityBase):
         logger.info(f"validate_mandatory_fields ::: finished")
 
     def _calculate_amount(self):
-        self.delivery_price = Restaurant.init_get_by_id(self.restaurant_id).get_delivery_price(self.delivery_address)
+        self.delivery_price = Restaurant.init_get_by_id(
+            self.company_id, self.restaurant_id).get_delivery_price(self.delivery_address)
         self.amount = Decimal(
             sum([item['details']['price'] * item['qty'] for item in self.menu_items.values()])
         ) + self.delivery_price.quantize(Decimal('1.00'))
@@ -226,8 +222,8 @@ class Order(EntityBase):
         'feedback_rate': lambda x: isinstance(x, Decimal) and 1 <= x <= 5
     }
 
-    def __init__(self, id_, user_id, **kwargs):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, user_id, **kwargs):
+        EntityBase.__init__(self, company_id, id_)
 
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
@@ -258,14 +254,17 @@ class Order(EntityBase):
     @utils_auth.authenticate_class
     def init_request_get_order(cls, request, order_id, restaurant_id):
         logger.info("init_request_get_order_authorized_user ::: started")
+        company_id = get_company_id_by_request(request)
         user_id = request.to_dict().get('auth_result', {}).get('user_id')
-        return cls(order_id, user_id, restaurant_id=restaurant_id)
+        return cls(company_id, order_id, user_id, restaurant_id=restaurant_id)
 
     @classmethod
     def init_create_order(cls, request, user_id):
+        logger.info("init_create_order ::: started")
+        company_id = get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
         id_ = request_body['pre_order_id']
-        c = cls(id_, user_id)
+        c = cls(company_id, id_, user_id)
         c._init_by_pre_order()
         return c
 
@@ -284,7 +283,7 @@ class Order(EntityBase):
 
     def fill_items_details(self):
         for item in self.menu_items.values():
-            item['details'] = MenuItem.init_get_by_id(item['id'], self.restaurant_id).to_ui()
+            item['details'] = MenuItem.init_get_by_id(self.company_id, item['id'], self.restaurant_id).to_ui()
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
@@ -292,7 +291,7 @@ class Order(EntityBase):
         self.fill_items_details()
         self._create_db_record()
         if self.user_id != UNAUTHORIZED_USER:
-            Cart.init_by_user_id(user_id=self.user_id).delete_db_record()
+            Cart.init_by_user_id(company_id=self.company_id, user_id=self.user_id).delete_db_record()
         return Response(status_code=http200, body=self._to_ui())
 
     @utils_app.request_exception_handler
@@ -303,16 +302,16 @@ class Order(EntityBase):
         return Response(status_code=http200, body=self._to_ui())
 
     def _init_by_pre_order(self):
-        self.pre_order = PreOrder.init_by_db_record(self.id_, self.user_id)
+        self.pre_order = PreOrder.init_by_db_record(self.company_id, self.id_, self.user_id)
         pre_order_dict = self.pre_order.to_dict()
         del pre_order_dict['date_created']
-        self.__init__(pre_order=self.pre_order, **pre_order_dict)
+        self.__init__(company_id=self.company_id, pre_order=self.pre_order, **pre_order_dict)
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk.format(restaurant_id=self.restaurant_id), self.sk.format(user_id=self.user_id, order_id=self.id_)
+        return self.pk.format(company_id=self.company_id, restaurant_id=self.restaurant_id), self.sk.format(user_id=self.user_id, order_id=self.id_)
 
     def _get_pk_sk_user_gsi(self) -> Tuple[str, str]:
-        return self.pk_gsi_user_orders.format(user_id=self.user_id), \
+        return self.pk_gsi_user_orders.format(company_id=self.company_id, user_id=self.user_id), \
                self.sk_gsi_user_orders.format(restaurant_id=self.restaurant_id, order_id=self.id_)
 
     def _get_db_item_by_user_gsi(self):
@@ -331,6 +330,7 @@ class Order(EntityBase):
 
     def _to_dict(self):
         return {
+            'company_id': self.company_id,
             'id_': self.id_,
             'user_id': self.user_id,
             'user_phone_number': self.user_phone_number,
@@ -359,6 +359,7 @@ class Order(EntityBase):
             'gsi_user_orders_partkey': pk_gsi_user_orders,
             'gsi_user_orders_sortkey': sk_gsi_user_orders,
             'record_type': self.record_type,
+            'company_id': self.company_id,
             **self._to_dict()
         }
         substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
@@ -399,33 +400,35 @@ class Order(EntityBase):
         return self._to_ui()
 
 
-def get_conditions_user(user_id):
-    return Key('gsi_user_orders_partkey').eq(Order.pk_gsi_user_orders.format(user_id=user_id)), 'gsi_user_orders'
+def get_conditions_user(company_id, user_id):
+    return Key('gsi_user_orders_partkey').eq(Order.pk_gsi_user_orders.format(company_id=company_id, user_id=user_id)), \
+        'gsi_user_orders'
 
 
-def get_conditions_rest_manager(restaurant_id):
+def get_conditions_rest_manager(company_id, restaurant_id):
     if not restaurant_id:
         raise MissingRestaurantId('restaurant_id must be provided in query parameters')
-    return Key('partkey').eq(Order.pk.format(restaurant_id=restaurant_id)), None
+    return Key('partkey').eq(Order.pk.format(company_id=company_id, restaurant_id=restaurant_id)), None
 
 
 @utils_app.request_exception_handler
 @utils_app.log_start_finish
 @utils_auth.authenticate
 def endpoint_get_orders(request, entity_type=None, entity_id=None):
+    company_id = get_company_id_by_request(request)
     user_role = request.to_dict().get('auth_result', {}).get('role')
     user_id = request.to_dict().get('auth_result', {}).get('user_id')
     match user_role:
         case 'user':
-            key_condition_exp, index_name = get_conditions_user(user_id)
+            key_condition_exp, index_name = get_conditions_user(company_id, user_id)
         case 'restaurant_manager':
             # Todo: check if the manager have permissions to the restaurant (by ID list in manager's record)
-            key_condition_exp, index_name = get_conditions_rest_manager(entity_id)
+            key_condition_exp, index_name = get_conditions_rest_manager(company_id, entity_id)
         case 'admin':
             if entity_type == 'user':
-                key_condition_exp, index_name = get_conditions_user(entity_id)
+                key_condition_exp, index_name = get_conditions_user(company_id, entity_id)
             elif entity_type == 'restaurant':
-                key_condition_exp, index_name = get_conditions_rest_manager(entity_id)
+                key_condition_exp, index_name = get_conditions_rest_manager(company_id, entity_id)
             else:
                 logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
                 raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')

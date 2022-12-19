@@ -7,6 +7,7 @@ from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.menu_items import MenuItem
 from chalicelib.utils import auth as utils_auth, db as utils_db, app as utils_app, data as utils_data
+from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.exceptions import RecordNotFound
 from chalicelib.utils.logger import logger
 
@@ -25,8 +26,8 @@ class Cart(EntityBase):
         'delivery_address': lambda x: isinstance(x, str)
     }
 
-    def __init__(self, id_, request_body=None):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, request_body=None):
+        EntityBase.__init__(self, company_id, id_)
 
         if request_body is None:
             request_body = {}
@@ -48,16 +49,18 @@ class Cart(EntityBase):
             self._init_db_record()
 
     @classmethod
-    def init_by_user_id(cls, user_id):
-        c = cls(id_=user_id)
+    def init_by_user_id(cls, company_id, user_id):
+        c = cls(company_id=company_id, id_=user_id)
         c._fill_db_item()
         return c
 
     @classmethod
     @utils_auth.authenticate_class
     def init_endpoint(cls, request):
-        logger.info("init_request_cart ::: started")
+        logger.info("init_endpoint ::: started")
+        company_id = get_company_id_by_request(request)
         return cls(
+            company_id=company_id,
             id_=request.to_dict().get('auth_result', {}).get('user_id'),
             request_body=utils_data.parse_raw_body(request)
         )
@@ -78,6 +81,7 @@ class Cart(EntityBase):
         if request_restaurant_id != self.restaurant_id:
             self.restaurant_id = request_restaurant_id
             self._create_db_record()
+            self.menu_items = {}
         self.menu_items[menu_item_id] = {'id': menu_item_id, 'qty': qty}
         all_items_available: bool = self._check_and_update_available_items()
         self._update_db_record()
@@ -101,7 +105,7 @@ class Cart(EntityBase):
         return Response(status_code=http200, body={'message': 'Cart was successfully cleared'})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk, self.sk.format(user_id=self.id_)
+        return self.pk.format(company_id=self.company_id), self.sk.format(user_id=self.id_)
 
     def _to_dict(self):
         return {
@@ -114,7 +118,7 @@ class Cart(EntityBase):
     def _check_and_update_available_items(self) -> bool:
         items_qnt = len(self.menu_items)
         self.menu_items = {item_id: info for item_id, info in self.menu_items.items() if
-                           MenuItem.init_get_by_id(item_id, self.restaurant_id).is_available}
+                           MenuItem.init_get_by_id(self.company_id, item_id, self.restaurant_id).is_available}
         return True if items_qnt == len(self.menu_items) else False
 
     def delete_db_record(self):

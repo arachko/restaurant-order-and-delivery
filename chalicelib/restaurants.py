@@ -11,6 +11,7 @@ from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import from_db
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
+from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.data import substitute_keys
 from chalicelib.utils.exceptions import WrongDeliveryAddress
 from chalicelib.utils.logger import logger
@@ -40,8 +41,8 @@ class Restaurant(EntityBase):
         "archived": lambda x: isinstance(x, bool)
     }
 
-    def __init__(self, id_, **kwargs):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, **kwargs):
+        EntityBase.__init__(self, company_id, id_)
 
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
@@ -67,23 +68,26 @@ class Restaurant(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_update(cls, request, restaurant_id=None, special_body=None):
         logger.info("init_request_create_update ::: started")
+        company_id = get_company_id_by_request(request)
         request_body = special_body or utils_data.parse_raw_body(request)
         id_ = restaurant_id or str(uuid4())
-        return cls(id_=id_, request_data=request.to_dict(), **request_body)
+        return cls(company_id=company_id, id_=id_, request_data=request.to_dict(), **request_body)
 
     @classmethod
-    def init_get_by_id(cls, restaurant_id):
+    def init_get_by_id(cls, company_id, restaurant_id):
         logger.info("init_request_get_by_id ::: started")
-        c = cls(restaurant_id)
+        c = cls(company_id, restaurant_id)
         c.__init__(**c._get_db_item())
         return c
 
     @staticmethod
     @utils_app.log_start_finish
     def endpoint_get_all(request) -> Response:
+        logger.info("endpoint_get_all ::: started")
+        company_id = get_company_id_by_request(request)
         filter_expression = Attr('archived').eq(False)
         restaurant_db_records: List[Dict] = utils_db.query_items_paged(
-            Key('partkey').eq(keys_structure.restaurants_pk),
+            Key('partkey').eq(keys_structure.restaurants_pk.format(company_id=company_id)),
             filter_expression=filter_expression
         )
         restaurants: List[Dict] = [Restaurant(**record)._to_ui() for record in restaurant_db_records]
@@ -118,7 +122,7 @@ class Restaurant(EntityBase):
         return Response(status_code=http200, body={'message': 'Restaurant was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk, self.sk.format(restaurant_id=self.id_)
+        return self.pk.format(company_id=self.company_id), self.sk.format(restaurant_id=self.id_)
 
     def _to_dict(self):
         return {

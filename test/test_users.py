@@ -1,17 +1,21 @@
 import json
 
 from chalicelib.constants import keys_structure
+from chalicelib.utils.auth import host_company_id_map
 from test.utils.request_utils import make_request
 from chalicelib.utils import db
 
 from test.utils.fixtures import chalice_gateway
 
+test_company_id = host_company_id_map['test-domain.com']
+
 
 def create_test_user(request):
     id_ = "eaa45e81-c17a-4da3-bdee-149919ca531b"
     user_db_record = {
-        "partkey": "users_",
+        "partkey": f"users_{test_company_id}",
         "sortkey": "eaa45e81-c17a-4da3-bdee-149919ca531b",
+        'company_id': test_company_id,
         "id_": id_,
         "login": "+79061234567",
         "role": "user",

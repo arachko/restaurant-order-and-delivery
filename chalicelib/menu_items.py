@@ -10,6 +10,7 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
+from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.logger import logger
 
 
@@ -41,8 +42,8 @@ class MenuItem(EntityBase):
         'options': lambda x: isinstance(x, list)
     }
 
-    def __init__(self, id_, restaurant_id, **kwargs):
-        EntityBase.__init__(self, id_)
+    def __init__(self, company_id, id_, restaurant_id, **kwargs):
+        EntityBase.__init__(self, company_id, id_)
 
         self.request_data = kwargs.get('request_data', {})
         self.db_record: dict = {}
@@ -72,23 +73,26 @@ class MenuItem(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_update(cls, request, restaurant_id, menu_item_id=None, special_body=None):
         logger.info("init_request_create_update ::: started")
+        company_id = get_company_id_by_request(request)
         request_body = special_body or utils_data.parse_raw_body(request)
         id_ = menu_item_id or str(uuid4())
-        return cls(id_=id_, restaurant_id=restaurant_id, request_data=request.to_dict(), **request_body)
+        return cls(company_id=company_id, id_=id_, restaurant_id=restaurant_id,
+                   request_data=request.to_dict(), **request_body)
 
     @classmethod
-    def init_get_by_id(cls, menu_item_id, restaurant_id):
+    def init_get_by_id(cls, company_id, menu_item_id, restaurant_id):
         logger.info("init_get_by_id ::: started")
-        c = cls(id_=menu_item_id, restaurant_id=restaurant_id)
+        c = cls(company_id=company_id, id_=menu_item_id, restaurant_id=restaurant_id)
         c.__init__(**c._get_db_item())
         return c
 
     @staticmethod
     @utils_app.log_start_finish
     def endpoint_get_menu_items(request, restaurant_id) -> Response:
+        company_id = get_company_id_by_request(request)
         filter_expression = Attr('archived').eq(False)
         menu_item_db_records: List[Dict] = utils_db.query_items_paged(
-            Key('partkey').eq(keys_structure.menu_items_pk.format(restaurant_id=restaurant_id)),
+            Key('partkey').eq(keys_structure.menu_items_pk.format(company_id=company_id, restaurant_id=restaurant_id)),
             filter_expression=filter_expression
         )
         menu_items: List[Dict] = [MenuItem(**record)._to_ui() for record in menu_item_db_records]
@@ -108,7 +112,8 @@ class MenuItem(EntityBase):
         return Response(status_code=http200, body={'message': 'Menu item was successfully updated', 'id': self.id_})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk.format(restaurant_id=self.restaurant_id), self.sk.format(menu_item_id=self.id_)
+        return self.pk.format(company_id=self.company_id, restaurant_id=self.restaurant_id), \
+            self.sk.format(menu_item_id=self.id_)
 
     def is_available_right_now(self) -> bool:
         # Todo: add opening-closing time check
