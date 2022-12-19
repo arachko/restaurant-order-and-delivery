@@ -3,9 +3,9 @@ import boto3
 
 from botocore.config import Config
 
-main_boto_region = os.environ.get('MAIN_BOTO_REGION', 'eu-central-1')
-aws_config = Config(retries={'max_attempts': 30}, region_name='eu-central-1')
-aws_config_ddb = Config(retries={'max_attempts': 30}, region_name=os.environ.get('AWS_REGION', 'eu-central-1'))
+main_boto_region = os.environ.get('DEFAULT_REGION', 'eu-central-1')
+aws_config = Config(retries={'max_attempts': 30}, region_name=main_boto_region)
+aws_config_ddb = Config(retries={'max_attempts': 30}, region_name=main_boto_region)
 
 # Cognito Client.
 cognito_client = boto3.client('cognito-idp', region_name=main_boto_region)

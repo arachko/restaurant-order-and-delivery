@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Tuple, Any, List, Dict
@@ -8,16 +9,19 @@ from chalice import Response
 
 from chalicelib.base_class_entity import EntityBase
 from chalicelib.carts import Cart
+from chalicelib.companies import get_company_settings_record
 from chalicelib.constants import keys_structure
-from chalicelib.constants.constants import UNAUTHORIZED_USER
+from chalicelib.constants.constants import UNAUTHORIZED_USER, ORDER_EMAIL_FROM
 from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.menu_items import MenuItem
 from chalicelib.restaurants import Restaurant
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
 from chalicelib.utils.data import substitute_keys
+from chalicelib.utils.email_templates import get_new_order_notification_message
 from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound, AccessDenied, MissingRestaurantId
 from chalicelib.utils.logger import logger
+from chalicelib.utils.notifications import send_email_ses
 
 
 class PreOrder(EntityBase):
@@ -430,3 +434,21 @@ def endpoint_get_orders(request, entity_type=None, entity_id=None):
 
     db_records = utils_db.query_items_paged(key_condition_expression=key_condition_exp, index_name=index_name)
     return Response(status_code=http200, body=[Order(**record).to_ui() for record in db_records])
+
+
+@utils_app.log_start_finish
+def db_trigger_send_order_notification(record_old: dict, record_new: dict, event_id: str, event_name: str):
+    logger.info(f'db_trigger_send_order_notification ::: order_record={record_new}, {event_id=}, {event_name=}')
+    if event_name.lower() == 'insert':
+        company_id = record_new.get('company_id')
+        settings_record: Dict = get_company_settings_record(company_id)
+        order_notification_emails: List = [
+            settings_record.get('order_notification_emails'),
+            record_new.get('user_email'),
+            os.environ.get("ALL_ORDERS_EMAIL")
+        ]
+        subject = f'New order has been received, ' \
+                  f'order ID - {record_new.get("id_")}, ' \
+                  f'address - {record_new.get("address")}'
+        email_body = get_new_order_notification_message(record_new)
+        send_email_ses(order_notification_emails, ORDER_EMAIL_FROM, subject, email_body)

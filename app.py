@@ -1,6 +1,8 @@
+import os
+
 from chalice import Chalice
 
-from chalicelib import auth, orders, carts, menu_items, restaurants, images, users
+from chalicelib import auth, orders, carts, menu_items, restaurants, images, users, triggers
 from chalicelib.constants.constants import UNAUTHORIZED_USER
 from chalicelib.utils import data as utils_data
 
@@ -10,18 +12,27 @@ app.api.binary_types.insert(0, 'multipart/form-data')
 app.debug = True
 
 
+def get_customers_table_stream_arn():
+    return os.environ["CUSTOMERS_TABLE_STREAM_ARN"]
+
+
 @app.authorizer()
-def test_auth(auth_request):
-    return auth.test_auth(auth_request)
+def role_authorizer(auth_request):
+    return auth.role_authorizer(auth_request)
+
+
+@app.on_dynamodb_record(stream_arn=get_customers_table_stream_arn())
+def db_customers_table_stream_trigger(event, context):
+    return triggers.db_customers_table_stream_trigger(event, context)
 
 
 # USERS
-@app.route('/users', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/users', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_user():
     return users.User.init_request_get(app.current_request).endpoint_get_user()
 
 
-@app.route('/users', methods=['PUT'], authorizer=test_auth, cors=True)
+@app.route('/users', methods=['PUT'], authorizer=role_authorizer, cors=True)
 def update_user():
     return users.User.init_request_update(app.current_request).endpoint_update_user()
 
@@ -45,7 +56,7 @@ def get_delivery_address(restaurant_id):
         endpoint_get_delivery_price(address)
 
 
-@app.route('/restaurants', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/restaurants', methods=['POST'], authorizer=role_authorizer, cors=True)
 def create_restaurant():
     """
     admin operation
@@ -53,7 +64,7 @@ def create_restaurant():
     return restaurants.Restaurant.init_request_create_update(app.current_request).endpoint_create()
 
 
-@app.route('/restaurants/{restaurant_id}', methods=['PUT'], authorizer=test_auth, cors=True)
+@app.route('/restaurants/{restaurant_id}', methods=['PUT'], authorizer=role_authorizer, cors=True)
 def update_restaurant(restaurant_id):
     """
     admin operation
@@ -62,7 +73,7 @@ def update_restaurant(restaurant_id):
         endpoint_update()
 
 
-@app.route('/restaurants/{restaurant_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/restaurants/{restaurant_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
 def archive_restaurant(restaurant_id):
     """
     admin operation
@@ -79,7 +90,7 @@ def get_restaurant_menu(restaurant_id):
     return menu_items.MenuItem.endpoint_get_menu_items(app.current_request, restaurant_id=restaurant_id)
 
 
-@app.route('/menu-items/{restaurant_id}', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/menu-items/{restaurant_id}', methods=['POST'], authorizer=role_authorizer, cors=True)
 def create_menu_item(restaurant_id):
     """
     restaurant manager operation
@@ -88,7 +99,7 @@ def create_menu_item(restaurant_id):
         endpoint_create_menu_item()
 
 
-@app.route('/menu-items/{restaurant_id}/{menu_item_id}', methods=['PUT'], authorizer=test_auth, cors=True)
+@app.route('/menu-items/{restaurant_id}/{menu_item_id}', methods=['PUT'], authorizer=role_authorizer, cors=True)
 def update_menu_item(restaurant_id, menu_item_id):
     """
     restaurant manager operation
@@ -97,7 +108,7 @@ def update_menu_item(restaurant_id, menu_item_id):
         app.current_request, restaurant_id=restaurant_id, menu_item_id=menu_item_id).endpoint_update_menu_item()
 
 
-@app.route('/menu-items/{restaurant_id}/{menu_item_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/menu-items/{restaurant_id}/{menu_item_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
 def delete_menu_item(restaurant_id, menu_item_id):
     """
     restaurant manager operation
@@ -109,28 +120,28 @@ def delete_menu_item(restaurant_id, menu_item_id):
 
 
 # CART
-@app.route('/carts', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/carts', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_cart():
     return carts.Cart.init_endpoint(app.current_request).endpoint_get_cart()
 
 
-@app.route('/carts', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/carts', methods=['POST'], authorizer=role_authorizer, cors=True)
 def add_item_to_cart():
     return carts.Cart.init_endpoint(app.current_request).endpoint_add_item_to_cart()
 
 
-@app.route('/carts/{menu_item_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/carts/{menu_item_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
 def remove_item_from_cart(menu_item_id):
     return carts.Cart.init_endpoint(app.current_request).endpoint_remove_item_from_cart(menu_item_id)
 
 
-@app.route('/carts', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/carts', methods=['DELETE'], authorizer=role_authorizer, cors=True)
 def clear_cart():
     return carts.Cart.init_endpoint(app.current_request).endpoint_clear_cart()
 
 
 # ORDERS
-@app.route('/orders', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_orders():
     """
     user can get his orders
@@ -140,16 +151,16 @@ def get_orders():
     return orders.endpoint_get_orders(app.current_request)
 
 
-@app.route('/orders/restaurant/{restaurant_id}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/restaurant/{restaurant_id}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_restaurant_orders(restaurant_id):
     """
-    restaurant manager can get restaurant's orders (he need permissions to manage the restaurant)
+    restaurant manager can get restaurant's orders (he needs permissions to manage the restaurant)
     admin can get restaurant's orders by restaurant_id
     """
     return orders.endpoint_get_orders(app.current_request, 'restaurant', restaurant_id)
 
 
-@app.route('/orders/user/{user_id}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/user/{user_id}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_user_orders(user_id):
     """
     admin can get user's orders by user_id
@@ -158,7 +169,7 @@ def get_user_orders(user_id):
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/archived/{year_month}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/archived/{year_month}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_archived_orders(year_month):
     """
     user can get his orders
@@ -169,7 +180,7 @@ def get_archived_orders(year_month):
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/archived/restaurant/{restaurant_id}/{year_month}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/archived/restaurant/{restaurant_id}/{year_month}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_restaurant_archived_orders(restaurant_id, year_month):
     """
     admin can get restaurant's orders by restaurant_id
@@ -178,7 +189,7 @@ def get_restaurant_archived_orders(restaurant_id, year_month):
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/archived/user/{user_id}/{year_month}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/archived/user/{user_id}/{year_month}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_user_archived_orders(user_id, year_month):
     """
     admin can get restaurant's orders by restaurant_id
@@ -186,7 +197,7 @@ def get_user_archived_orders(user_id, year_month):
     return orders.get_user_archived_orders(app.current_request, user_id, year_month)
 
 
-@app.route('/orders/id/{restaurant_id}/{order_id}', methods=['GET'], authorizer=test_auth, cors=True)
+@app.route('/orders/id/{restaurant_id}/{order_id}', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_order_by_id(order_id, restaurant_id):
     """
     user can get details only his orders
@@ -226,7 +237,7 @@ def create_order_unauthorized():
     return orders.Order.init_request_create_order_unauthorized(app.current_request).endpoint_create_order()
 
 
-@app.route('/orders/pre-order', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/orders/pre-order', methods=['POST'], authorizer=role_authorizer, cors=True)
 def create_pre_order_authorized():
     """
     The endpoint is for creating pre-orders by authorized users
@@ -236,7 +247,7 @@ def create_pre_order_authorized():
         endpoint_create_pre_order()
 
 
-@app.route('/orders', methods=['POST'], authorizer=test_auth, cors=True)
+@app.route('/orders', methods=['POST'], authorizer=role_authorizer, cors=True)
 def create_order_authorized():
     """
     The endpoint is for creating orders by authorized users
@@ -245,7 +256,7 @@ def create_order_authorized():
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/{restaurant_id}/{order_id}', methods=['PUT'], authorizer=test_auth, cors=True)
+@app.route('/orders/{restaurant_id}/{order_id}', methods=['PUT'], authorizer=role_authorizer, cors=True)
 def update_order():
     """
     restaurant manager operation (comment required when manager updating an order)
@@ -254,7 +265,7 @@ def update_order():
 
 
 # Todo: TO BE IMPLEMENTED
-@app.route('/orders/{restaurant_id}/{order_id}', methods=['DELETE'], authorizer=test_auth, cors=True)
+@app.route('/orders/{restaurant_id}/{order_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
 def delete_order():
     """
     user can archive completed order
@@ -265,7 +276,7 @@ def delete_order():
 
 # IMAGES
 # Todo: TO BE IMPLEMENTED
-@app.route('/image-upload', methods=['POST'], content_types=['multipart/form-data'], authorizer=test_auth, cors=True)
+@app.route('/image-upload', methods=['POST'], content_types=['multipart/form-data'], authorizer=role_authorizer, cors=True)
 def image_upload():
     """
     restaurant manager operation
