@@ -6,9 +6,7 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.menu_items import MenuItem
-from chalicelib.utils import auth as utils_auth, db as utils_db, app as utils_app, data as utils_data
-from chalicelib.utils.auth import get_company_id_by_request
-from chalicelib.utils.exceptions import RecordNotFound
+from chalicelib.utils import auth as utils_auth, db as utils_db, app as utils_app, data as utils_data, exceptions
 from chalicelib.utils.logger import logger
 
 
@@ -45,7 +43,7 @@ class Cart(EntityBase):
             self.restaurant_id = self.db_record.get('restaurant_id')
             self.delivery_address = self.db_record.get('delivery_address')
             self.menu_items = self.db_record.get('menu_items')
-        except RecordNotFound:
+        except exceptions.RecordNotFound:
             self._init_db_record()
 
     @classmethod
@@ -58,10 +56,10 @@ class Cart(EntityBase):
     @utils_auth.authenticate_class
     def init_endpoint(cls, request):
         logger.info("init_endpoint ::: started")
-        company_id = get_company_id_by_request(request)
+        auth_result = request.auth_result
         return cls(
-            company_id=company_id,
-            id_=request.to_dict().get('auth_result', {}).get('user_id'),
+            company_id=auth_result['company_id'],
+            id_=request.auth_result.get('user_id'),
             request_body=utils_data.parse_raw_body(request)
         )
 

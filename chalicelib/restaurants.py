@@ -10,10 +10,7 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import from_db
-from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
-from chalicelib.utils.auth import get_company_id_by_request
-from chalicelib.utils.data import substitute_keys
-from chalicelib.utils.exceptions import WrongDeliveryAddress
+from chalicelib.utils import auth as utils_auth, data as utils_data, db as utils_db, app as utils_app, exceptions
 from chalicelib.utils.logger import logger
 
 
@@ -68,10 +65,10 @@ class Restaurant(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_update(cls, request, restaurant_id=None, special_body=None):
         logger.info("init_request_create_update ::: started")
-        company_id = get_company_id_by_request(request)
+        auth_result = request.auth_result
         request_body = special_body or utils_data.parse_raw_body(request)
         id_ = restaurant_id or str(uuid4())
-        return cls(company_id=company_id, id_=id_, request_data=request.to_dict(), **request_body)
+        return cls(company_id=auth_result['company_id'], id_=id_, request_data=request.to_dict(), **request_body)
 
     @classmethod
     def init_get_by_id(cls, company_id, restaurant_id):
@@ -84,7 +81,7 @@ class Restaurant(EntityBase):
     @utils_app.log_start_finish
     def endpoint_get_all(request) -> Response:
         logger.info("endpoint_get_all ::: started")
-        company_id = get_company_id_by_request(request)
+        company_id = utils_auth.get_company_id_by_request(request)
         filter_expression = Attr('archived').eq(False)
         restaurant_db_records: List[Dict] = utils_db.query_items_paged(
             Key('partkey').eq(keys_structure.restaurants_pk.format(company_id=company_id)),
@@ -159,7 +156,7 @@ class Restaurant(EntityBase):
         item['settings']['category_sequence'] = {
             int(key): value for key, value in item.get('settings', {}).get('category_sequence', {}).items()
         }
-        substitute_keys(dict_to_process=item, base_keys=from_db)
+        utils_data.substitute_keys(dict_to_process=item, base_keys=from_db)
         return item
 
     def get_delivery_price(self, delivery_address):
@@ -167,6 +164,6 @@ class Restaurant(EntityBase):
         To be implemented
         """
         if not delivery_address:
-            raise WrongDeliveryAddress('Provided delivery address is wrong')
+            raise exceptions.WrongDeliveryAddress('Provided delivery address is wrong')
         rest_address = self.address
         return Decimal(0).quantize(Decimal('1.00'))

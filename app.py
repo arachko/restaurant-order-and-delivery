@@ -1,10 +1,9 @@
 import os
-
-import chalice
+# import chalice
 from chalice import Chalice
 
 from chalicelib import auth, orders, carts, menu_items, restaurants, images, users, triggers
-from chalicelib.auth import MonsterAuthorizer
+# from chalicelib.auth import MonsterAuthorizer
 from chalicelib.constants.constants import UNAUTHORIZED_USER
 from chalicelib.utils import data as utils_data
 from chalicelib.utils.auth import get_company_id_by_request
@@ -14,7 +13,7 @@ app = Chalice(app_name='restaurant-order-and-delivery')
 app.api.binary_types.insert(0, 'multipart/form-data')
 app.debug = True
 
-chalice.app.ChaliceAuthorizer = MonsterAuthorizer
+# chalice.app.ChaliceAuthorizer = MonsterAuthorizer
 
 
 def get_customers_table_stream_arn():
@@ -50,15 +49,16 @@ def get_restaurants():
 
 @app.route('/restaurants/{restaurant_id}', methods=['GET'], cors=True)
 def get_restaurant_by_id(restaurant_id):
-    return restaurants.Restaurant.init_get_by_id(get_company_id_by_request(app.current_request), restaurant_id).\
+    company_id = get_company_id_by_request(app.current_request)
+    return restaurants.Restaurant.init_get_by_id(company_id, restaurant_id).\
         endpoint_get_by_id()
 
 
 @app.route('/restaurants/{restaurant_id}/delivery-price', methods=['POST'], cors=True)
 def get_delivery_address(restaurant_id):
     address = utils_data.parse_raw_body(app.current_request).get('delivery_address')
-    return restaurants.Restaurant.init_get_by_id(get_company_id_by_request(app.current_request), restaurant_id).\
-        endpoint_get_delivery_price(address)
+    company_id = get_company_id_by_request(app.current_request)
+    return restaurants.Restaurant.init_get_by_id(company_id, restaurant_id).endpoint_get_delivery_price(address)
 
 
 @app.route('/restaurants', methods=['POST'], authorizer=role_authorizer, cors=True)
@@ -280,7 +280,6 @@ def delete_order():
 
 
 # IMAGES
-# Todo: TO BE IMPLEMENTED
 @app.route('/image-upload', methods=['POST'], content_types=['multipart/form-data'],
            authorizer=role_authorizer, cors=True)
 def image_upload():

@@ -6,7 +6,6 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import auth as utils_auth, app as utils_app, data as utils_data
-from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.logger import logger
 
 
@@ -61,17 +60,16 @@ class User(EntityBase):
     @utils_auth.authenticate_class
     def init_request_get(cls, request):
         logger.info("init_request_get ::: started")
-        company_id = get_company_id_by_request(request)
-        return cls.init_by_id(company_id, request.to_dict().get('auth_result', {}).get('user_id'))
+        auth_result = request.auth_result
+        return cls.init_by_id(auth_result['company_id'], auth_result['user_id'])
 
     @classmethod
     @utils_auth.authenticate_class
     def init_request_update(cls, request):
         logger.info("init_request_update ::: started")
-        company_id = get_company_id_by_request(request)
+        auth_result = request.auth_result
         request_body = utils_data.parse_raw_body(request)
-        id_ = request.to_dict().get('auth_result', {}).get('user_id')
-        return cls(company_id=company_id, id_=id_, **request_body)
+        return cls(company_id=auth_result['company_id'], id_=auth_result['user_id'], **request_body)
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish

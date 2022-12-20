@@ -8,8 +8,7 @@ from chalice import Response
 
 from chalicelib.constants.constants import MAIN_IMAGE_NAME, THUMB_IMAGE_NAME
 from chalicelib.constants.status_codes import http200
-from chalicelib.utils import auth as utils_auth, app as utils_app
-from chalicelib.utils.s3 import upload_file_to_s3
+from chalicelib.utils import auth as utils_auth, app as utils_app, s3 as utils_s3
 from PIL import Image
 
 entities_to_upload_attachment_white_list = ['restaurant', 'menu_item']
@@ -72,7 +71,7 @@ def image_upload(current_request) -> Response:
     else:
         raise Exception(f'You could not upload attachment to {entity_type=}')
 
-    upload_file_to_s3(content_main, path_main, 'application/octet-stream')
-    upload_file_to_s3(content_thumb, path_thumb, 'application/octet-stream')
+    utils_s3.upload_file_to_s3(content_main, path_main, 'application/octet-stream')
+    utils_s3.upload_file_to_s3(content_thumb, path_thumb, 'application/octet-stream')
     return Response(status_code=http200, headers={"Content-Type": 'application/json'},
                     body={'message': f'{entity_type} image was updated successfully'})

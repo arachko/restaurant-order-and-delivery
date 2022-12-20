@@ -48,7 +48,7 @@ def authenticate(func):
             logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
-            company_id = get_company_id_by_request(request)
+            company_id = 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
             user_id = request.headers['authorization']
             user_role = get_user_role(company_id, user_id)
             if user_id:
@@ -77,7 +77,7 @@ def authenticate_class(func):
             logger.current_request_id = request.lambda_context.aws_request_id.split('-')[4]
             log_request(request)
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
-            company_id = get_company_id_by_request(request)
+            company_id = 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
             user_id = request.headers['authorization']
             user_role = get_user_role(company_id, user_id)
             if user_id:

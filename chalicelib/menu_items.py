@@ -10,7 +10,6 @@ from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
-from chalicelib.utils.auth import get_company_id_by_request
 from chalicelib.utils.logger import logger
 
 
@@ -73,10 +72,10 @@ class MenuItem(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_update(cls, request, restaurant_id, menu_item_id=None, special_body=None):
         logger.info("init_request_create_update ::: started")
-        company_id = get_company_id_by_request(request)
+        auth_result = request.auth_result
         request_body = special_body or utils_data.parse_raw_body(request)
         id_ = menu_item_id or str(uuid4())
-        return cls(company_id=company_id, id_=id_, restaurant_id=restaurant_id,
+        return cls(company_id=auth_result['company_id'], id_=id_, restaurant_id=restaurant_id,
                    request_data=request.to_dict(), **request_body)
 
     @classmethod
@@ -89,7 +88,7 @@ class MenuItem(EntityBase):
     @staticmethod
     @utils_app.log_start_finish
     def endpoint_get_menu_items(request, restaurant_id) -> Response:
-        company_id = get_company_id_by_request(request)
+        company_id = utils_auth.get_company_id_by_request(request)
         filter_expression = Attr('archived').eq(False)
         menu_item_db_records: List[Dict] = utils_db.query_items_paged(
             Key('partkey').eq(keys_structure.menu_items_pk.format(company_id=company_id, restaurant_id=restaurant_id)),

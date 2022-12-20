@@ -16,13 +16,14 @@ from chalicelib.constants.status_codes import http200
 from chalicelib.constants.substitute_keys import to_db, from_db
 from chalicelib.menu_items import MenuItem
 from chalicelib.restaurants import Restaurant
-from chalicelib.utils import auth as utils_auth, data as utils_data, exceptions, db as utils_db, app as utils_app
-from chalicelib.utils.auth import get_company_id_by_request
-from chalicelib.utils.data import substitute_keys
-from chalicelib.utils.email_templates import get_new_order_notification_message
-from chalicelib.utils.exceptions import SomeItemsAreNotAvailable, OrderNotFound, AccessDenied, MissingRestaurantId
+from chalicelib.utils import auth as utils_auth, \
+    data as utils_data, \
+    db as utils_db, \
+    app as utils_app, \
+    notifications as utils_notifications, \
+    exceptions, \
+    email_templates
 from chalicelib.utils.logger import logger
-from chalicelib.utils.notifications import send_email_ses
 
 
 class PreOrder(EntityBase):
@@ -73,9 +74,9 @@ class PreOrder(EntityBase):
     @classmethod
     def init_request_create_pre_order_unauthorized_user(cls, request):
         logger.info("init_request_create_pre_order_unauthorized_user ::: started")
-        company_id = get_company_id_by_request(request)
+        company_id = utils_auth.get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
-        substitute_keys(request_body, to_db)
+        utils_data.substitute_keys(request_body, to_db)
         return cls(
             company_id=company_id,
             id_=str(uuid4()).split('-')[0],
@@ -92,15 +93,16 @@ class PreOrder(EntityBase):
     @utils_auth.authenticate_class
     def init_request_create_pre_order_authorized_user(cls, request):
         logger.info("init_request_create_pre_order_authorized_user ::: started")
-        company_id = get_company_id_by_request(request)
-        user_id = request.to_dict().get('auth_result', {}).get('user_id')
+        auth_result = request.auth_result
+        user_id = auth_result['user_id']
+        company_id = auth_result['company_id']
         cart: Cart = Cart.init_by_user_id(company_id, user_id)
         request_body = utils_data.parse_raw_body(request)
-        substitute_keys(request_body, to_db)
+        utils_data.substitute_keys(request_body, to_db)
         return cls(
             company_id=company_id,
             id_=str(uuid4()).split('-')[0],
-            user_id=request.to_dict().get('auth_result', {}).get('user_id'),
+            user_id=user_id,
             restaurant_id=cart.restaurant_id,
             delivery_address=request_body['delivery_address'],
             menu_items=cart.menu_items,
@@ -171,8 +173,8 @@ class PreOrder(EntityBase):
         # self.menu_item_list = [MenuItem.init_get_by_id(item['id_'], self.restaurant_id) for item in self.menu_items]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
-            raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
-                                           'them from cart and recreate the order')
+            raise exceptions.SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
+                                                      'them from cart and recreate the order')
 
     def _create_db_record(self):
         self._calculate_amount()
@@ -254,14 +256,12 @@ class Order(EntityBase):
     @utils_auth.authenticate_class
     def init_request_get_order(cls, request, order_id, restaurant_id):
         logger.info("init_request_get_order_authorized_user ::: started")
-        company_id = get_company_id_by_request(request)
-        user_id = request.to_dict().get('auth_result', {}).get('user_id')
-        return cls(company_id, order_id, user_id, restaurant_id=restaurant_id)
+        auth_result = request.auth_result
+        return cls(auth_result['company_id'], order_id, auth_result['user_id'], restaurant_id=restaurant_id)
 
     @classmethod
-    def init_create_order(cls, request, user_id):
+    def init_create_order(cls, request, company_id, user_id):
         logger.info("init_create_order ::: started")
-        company_id = get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
         id_ = request_body['pre_order_id']
         c = cls(company_id, id_, user_id)
@@ -271,15 +271,16 @@ class Order(EntityBase):
     @classmethod
     def init_request_create_order_unauthorized(cls, request):
         logger.info("init_request_create_order_unauthorized_user ::: started")
-        user_id = UNAUTHORIZED_USER
-        return cls.init_create_order(request, user_id)
+        return cls.init_create_order(request, user_id=UNAUTHORIZED_USER,
+                                     company_id=utils_auth.get_company_id_by_request(request))
 
     @classmethod
     @utils_auth.authenticate_class
     def init_request_create_order_authorized(cls, request):
         logger.info("init_request_create_order_authorized_user ::: started")
-        user_id = request.to_dict().get('auth_result', {}).get('user_id')
-        return cls.init_create_order(request, user_id)
+        auth_result = request.auth_result
+        return cls.init_create_order(request, user_id=auth_result['user_id'],
+                                     company_id=auth_result['company_id'])
 
     def fill_items_details(self):
         for item in self.menu_items.values():
@@ -324,7 +325,7 @@ class Order(EntityBase):
             index_name='gsi_user_orders'
         )
         if not orders:
-            raise OrderNotFound(f'Order with ID {self.id_} not found')
+            raise exceptions.OrderNotFound(f'Order with ID {self.id_} not found')
         else:
             return orders[0]
 
@@ -362,7 +363,7 @@ class Order(EntityBase):
             'company_id': self.company_id,
             **self._to_dict()
         }
-        substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
+        utils_data.substitute_keys(dict_to_process=self.db_record, base_keys=to_db)
 
     def _validate_mandatory_fields(self):
         logger.info(f"validate_mandatory_fields ::: started")
@@ -380,8 +381,8 @@ class Order(EntityBase):
         # self.menu_item_list = [MenuItem.init_get_by_id(item['id'], self.restaurant_id) for item in self.menu_items]
         # items_availability = [{item.id_: item.is_available_right_now()} for item in self.menu_item_list]
         if not all([item.is_available_right_now() for item in self.menu_item_list]):
-            raise SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
-                                           'them from cart and recreate the order')
+            raise exceptions.SomeItemsAreNotAvailable('Some items currently unavailable, please delete '
+                                                      'them from cart and recreate the order')
 
     def _create_db_record(self):
         self._init_db_record()
@@ -393,7 +394,7 @@ class Order(EntityBase):
     def _to_ui(self):
         item = self._to_dict()
         item['items'] = [item._to_ui() for item in self.menu_item_list]
-        substitute_keys(dict_to_process=item, base_keys=from_db)
+        utils_data.substitute_keys(dict_to_process=item, base_keys=from_db)
         return item
 
     def to_ui(self):
@@ -407,7 +408,7 @@ def get_conditions_user(company_id, user_id):
 
 def get_conditions_rest_manager(company_id, restaurant_id):
     if not restaurant_id:
-        raise MissingRestaurantId('restaurant_id must be provided in query parameters')
+        raise exceptions.MissingRestaurantId('restaurant_id must be provided in query parameters')
     return Key('partkey').eq(Order.pk.format(company_id=company_id, restaurant_id=restaurant_id)), None
 
 
@@ -415,9 +416,8 @@ def get_conditions_rest_manager(company_id, restaurant_id):
 @utils_app.log_start_finish
 @utils_auth.authenticate
 def endpoint_get_orders(request, entity_type=None, entity_id=None):
-    company_id = get_company_id_by_request(request)
-    user_role = request.to_dict().get('auth_result', {}).get('role')
-    user_id = request.to_dict().get('auth_result', {}).get('user_id')
+    auth_result = request.auth_result
+    company_id, user_id, user_role = auth_result['company_id'], auth_result['user_id'], auth_result['role']
     match user_role:
         case 'user':
             key_condition_exp, index_name = get_conditions_user(company_id, user_id)
@@ -433,7 +433,7 @@ def endpoint_get_orders(request, entity_type=None, entity_id=None):
                 logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
                 raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')
         case _:
-            raise AccessDenied(f"You don't have permissions to access this resource")
+            raise exceptions.AccessDenied(f"You don't have permissions to access this resource")
 
     db_records = utils_db.query_items_paged(key_condition_expression=key_condition_exp, index_name=index_name)
     return Response(status_code=http200, body=[Order(**record).to_ui() for record in db_records])
@@ -453,5 +453,5 @@ def db_trigger_send_order_notification(record_old: dict, record_new: dict, event
         subject = f'New order has been received, ' \
                   f'order ID - {record_new.get("id_")}, ' \
                   f'address - {record_new.get("address")}'
-        email_body = get_new_order_notification_message(record_new)
-        send_email_ses(order_notification_emails, ORDER_EMAIL_FROM, subject, email_body)
+        email_body = email_templates.get_new_order_notification_message(record_new)
+        utils_notifications.send_email_ses(order_notification_emails, ORDER_EMAIL_FROM, subject, email_body)
