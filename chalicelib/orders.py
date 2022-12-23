@@ -43,7 +43,9 @@ class PreOrder(EntityBase):
         'amount': lambda x: isinstance(x, Decimal),
         'delivery_address': lambda x: isinstance(x, str),
         'delivery_price': lambda x: isinstance(x, Decimal),
-        "archived": lambda x: isinstance(x, bool)
+        "archived": lambda x: isinstance(x, bool),
+        'delivery_method': lambda x: isinstance(x, str),
+        'payment_method': lambda x: isinstance(x, str)
     }
 
     optional_fields_validation = {
@@ -69,7 +71,9 @@ class PreOrder(EntityBase):
         self.date_created: str = datetime.today().isoformat(timespec='seconds')
         self.archived: bool = kwargs.get('archived', False)
         self.comment_: str = kwargs.get('comment_')
-        self.record_type = 'pre_order'
+        self.record_type: str = 'pre_order'
+        self.delivery_method: str = kwargs.get('delivery_method')
+        self.payment_method: str = kwargs.get('payment_method')
 
     @classmethod
     def init_request_create_pre_order_unauthorized_user(cls, request):
@@ -86,7 +90,9 @@ class PreOrder(EntityBase):
             menu_items=request_body['menu_items'],
             user_phone_number=request_body['user_phone_number'],
             user_email=request_body.get('user_email'),
-            comment_=request_body.get('comment_')
+            comment_=request_body.get('comment_'),
+            delivery_method=request_body.get('delivery_method'),
+            payment_method=request_body.get('payment_method')
         )
 
     @classmethod
@@ -104,11 +110,13 @@ class PreOrder(EntityBase):
             id_=str(uuid4()).split('-')[0],
             user_id=user_id,
             restaurant_id=cart.restaurant_id,
-            delivery_address=request_body['delivery_address'],
             menu_items=cart.menu_items,
+            delivery_address=request_body['delivery_address'],
             user_phone_number=request_body['user_phone_number'],
             user_email=request_body.get('user_email'),
-            comment_=request_body.get('comment_')
+            comment_=request_body.get('comment_'),
+            delivery_method=request_body.get('delivery_method'),
+            payment_method=request_body.get('payment_method')
         )
 
     @classmethod
@@ -144,7 +152,9 @@ class PreOrder(EntityBase):
             'menu_items': self.menu_items,
             'amount': self.amount,
             'archived': self.archived,
-            "comment_": self.comment_
+            "comment_": self.comment_,
+            'delivery_method': self.delivery_method,
+            'payment_method': self.payment_method
         }
 
     def to_dict(self):
@@ -214,7 +224,9 @@ class Order(EntityBase):
         'delivery_price': lambda x: isinstance(x, Decimal),
         "date_updated": lambda x: isinstance(x, str),
         "updated_by": lambda x: isinstance(x, str),
-        "archived": lambda x: isinstance(x, bool)
+        "archived": lambda x: isinstance(x, bool),
+        'delivery_method': lambda x: isinstance(x, str),
+        'payment_method': lambda x: isinstance(x, str)
     }
 
     optional_fields_validation = {
@@ -251,6 +263,8 @@ class Order(EntityBase):
         self.feedback: str = kwargs.get('feedback')
         self.feedback_rate: Any[Decimal, None] = kwargs.get('feedback_rate', None)
         self.record_type = 'order'
+        self.delivery_method: str = kwargs.get('delivery_method')
+        self.payment_method: str = kwargs.get('payment_method')
 
     @classmethod
     @utils_auth.authenticate_class
@@ -348,7 +362,9 @@ class Order(EntityBase):
             'updated_by': self.updated_by,
             'archived': self.archived,
             "comment_": self.comment_,
-            "feedback": self.feedback
+            "feedback": self.feedback,
+            'delivery_method': self.delivery_method,
+            'payment_method': self.payment_method
         }
 
     def _init_db_record(self):

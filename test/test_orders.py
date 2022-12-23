@@ -113,7 +113,9 @@ def create_test_pre_order_unauthorized_user(chalice_gateway, restaurant_id, menu
             menu_item_to_order_1: {'id': menu_item_to_order_1, 'qty': 2},
             menu_item_to_order_2: {'id': menu_item_to_order_2, 'qty': 1}
         },
-        'comment': 'Please deliver my order ASAP'
+        'comment': 'Please deliver my order ASAP',
+        'payment_method': 'card',
+        'delivery_method': 'pick-up'
     }
 
     response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized",
@@ -153,7 +155,10 @@ def create_test_pre_order_authorized_user(chalice_gateway, request):
         'user_phone_number': '+79216146600',
         'user_email': 'rachko.a@gmail.com',
         'delivery_address': 'Mayskiy lane, 2, flat 119',
-        'comment': 'Please deliver my order ASAP'
+        'comment': 'Please deliver my order ASAP',
+        'payment_method': 'cash',
+        'delivery_method': 'delivery'
+
     }
 
     response = make_request(chalice_gateway, endpoint=f"/orders/pre-order", json_body=request_body,
@@ -201,7 +206,9 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
             menu_item_id: {'id': menu_item_id, 'qty': 2},
             menu_item_id_2: {'id': menu_item_id_2, 'qty': 1}
         },
-        'comment': 'Please deliver my order ASAP'
+        'comment': 'Please deliver my order ASAP',
+        'payment_method': 'cash',
+        'delivery_method': 'delivery'
     }
 
     response = make_request(chalice_gateway, endpoint=f"/orders/pre-order/unauthorized",
@@ -314,7 +321,9 @@ def test_create_pre_order_authorized_user(chalice_gateway, request):
         'user_phone_number': '+79216146600',
         'user_email': 'rachko.a@gmail.com',
         'delivery_address': 'Mayskiy lane, 2, flat 119',
-        'comment': 'Please deliver my order ASAP'
+        'comment': 'Please deliver my order ASAP',
+        'payment_method': 'card',
+        'delivery_method': 'pick-up'
     }
 
     response = make_request(chalice_gateway, endpoint=f"/orders/pre-order", json_body=request_body,
