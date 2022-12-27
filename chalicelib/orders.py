@@ -434,24 +434,23 @@ def endpoint_get_orders(request, entity_type=None, entity_id=None):
     qp = request.query_params or {}
     restaurant_id, start_key, limit = qp.get('restaurant_id'), qp.get('start_key'), qp.get('page_size')
     new_last_key = None
-    match user_role:
-        case 'user':
-            db_records = get_user_db_orders(company_id, restaurant_id, user_id)
-        case 'restaurant_manager':
-            accessible_restaurants = auth_result['permissions']['restaurants'].keys()
-            if entity_id not in accessible_restaurants:
-                raise exceptions.AccessDenied("Access Denied error")
+    if user_role == 'user':
+        db_records = get_user_db_orders(company_id, restaurant_id, user_id)
+    elif user_role == 'restaurant_manager':
+        accessible_restaurants = auth_result['permissions']['restaurants'].keys()
+        if entity_id not in accessible_restaurants:
+            raise exceptions.AccessDenied("Access Denied error")
+        db_records, new_last_key = get_restaurant_db_orders_paginated(company_id, entity_id, limit, start_key)
+    elif user_role == 'admin':
+        if entity_type == 'user':
+            db_records = get_user_db_orders(company_id, restaurant_id, entity_id)
+        elif entity_type == 'restaurant':
             db_records, new_last_key = get_restaurant_db_orders_paginated(company_id, entity_id, limit, start_key)
-        case 'admin':
-            if entity_type == 'user':
-                db_records = get_user_db_orders(company_id, restaurant_id, entity_id)
-            elif entity_type == 'restaurant':
-                db_records, new_last_key = get_restaurant_db_orders_paginated(company_id, entity_id, limit, start_key)
-            else:
-                logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
-                raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')
-        case _:
-            raise exceptions.AccessDenied(f"You don't have permissions to access this resource")
+        else:
+            logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
+            raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')
+    else:
+        raise exceptions.AccessDenied(f"You don't have permissions to access this resource")
 
     if new_last_key:
         new_last_key = new_last_key['sortkey'].split('_')[-1]

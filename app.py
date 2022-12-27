@@ -17,7 +17,7 @@ app.debug = True
 
 
 def get_customers_table_stream_arn():
-    return os.environ["CUSTOMERS_TABLE_STREAM_ARN"]
+    return os.environ.get("CUSTOMERS_TABLE_STREAM_ARN")
 
 
 @app.authorizer()

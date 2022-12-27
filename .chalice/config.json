@@ -9,6 +9,7 @@
         "DEFAULT_REGION": "eu-central-1",
         "ENDPOINT_URL": "http://localhost:9000",
         "GEN_TABLE_NAME": "local",
+        "CUSTOMERS_TABLE_NAME": "local",
         "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
         "MAX_IMG_WIDTH": "900",
         "MAX_THUMBNAIL_WIDTH": "200",
@@ -21,11 +22,12 @@
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
-        "GEN_TABLE_NAME": "restmonster-gen-dev",
+        "GEN_TABLE_NAME": "restmonster-main-dev",
+        "CUSTOMERS_TABLE_NAME": "restmonster-customers-dev",
         "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
         "MAX_IMG_WIDTH": "900",
         "MAX_THUMBNAIL_WIDTH": "200",
-        "CUSTOMERS_TABLE_STREAM_ARN": "test_stream_arn",
+        "CUSTOMERS_TABLE_STREAM_ARN": "arn:aws:dynamodb:eu-central-1:396199942073:table/restmonster-customers-dev/stream/2022-12-27T22:00:39.085",
         "ALL_ORDERS_EMAIL": "rachko.a@gmail.com",
         "DEFAULT_PAGE_SIZE": "30"
       }
