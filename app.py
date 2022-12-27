@@ -8,7 +8,7 @@ from chalicelib.constants.constants import UNAUTHORIZED_USER
 from chalicelib.utils import data as utils_data
 from chalicelib.utils.auth import get_company_id_by_request
 
-app = Chalice(app_name='restaurant-order-and-delivery')
+app = Chalice(app_name='restmonster-backend')
 
 app.api.binary_types.insert(0, 'multipart/form-data')
 app.debug = True
