@@ -1,4 +1,5 @@
 #!/bin/bash
+pip install --upgrade pip
 pip install --upgrade awscli
 aws --version
 pip install virtualenv
@@ -12,4 +13,4 @@ which chalice
 chalice --version
 echo $APP_S3_BUCKET
 chalice package --merge-template pipeline.json tmp/packaged/
-aws cloudformation package --template-file /tmp/packaged/sam.json --s3-bucket "${APP_S3_BUCKET}" --output-template-file transformed.yaml
+aws cloudformation package --template-file ./tmp/packaged/sam.json --s3-bucket "${APP_S3_BUCKET}" --output-template-file transformed.yaml
