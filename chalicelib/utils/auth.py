@@ -30,11 +30,12 @@ def get_company_id_by_request(request: Request):
     return get_company_id_by_host(request.headers['host'])
 
 
-def get_user_role(company_id, user_id):
-    return utils_db.get_db_item(
+def get_user_role_and_permissions(company_id, user_id):
+    user_item = utils_db.get_db_item(
         partkey=keys_structure.users_pk.format(company_id=company_id),
         sortkey=keys_structure.users_sk.format(user_id=user_id)
-    ).get('role')
+    )
+    return user_item.get('role'), user_item.get('permissions_', {})
 
 
 def authenticate(func):
@@ -50,9 +51,10 @@ def authenticate(func):
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             company_id = 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
             user_id = request.headers['authorization']
-            user_role = get_user_role(company_id, user_id)
+            user_role, permissions = get_user_role_and_permissions(company_id, user_id)
             if user_id:
-                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role,
+                                                 'company_id': company_id, 'permissions': permissions})
                 result = func(*args, **kwargs)
                 logger.info(f'authenticate ::: SUCCESS, func.__name__ {func.__name__}')
                 return result
@@ -79,12 +81,14 @@ def authenticate_class(func):
             # body, username, groups, user_id, user_email = auth_result_cognito_v1(request)  # Todo: test auth added
             company_id = 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
             user_id = request.headers['authorization']
-            user_role = get_user_role(company_id, user_id)
+            user_role, permissions = get_user_role_and_permissions(company_id, user_id)
             if user_id:
-                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role, 'company_id': company_id})
+                setattr(request, 'auth_result', {'user_id': user_id, 'role': user_role,
+                                                 'company_id': company_id, 'permissions': permissions})
                 setattr(instance, 'user_id', user_id)
                 setattr(instance, 'role', user_role)
                 setattr(instance, 'company_id', company_id)
+                setattr(instance, 'permissions', permissions)
                 return func(*args, **kwargs)
             else:
                 raise utils_exceptions.NotAuthorizedException('Error occurred in authorization process')

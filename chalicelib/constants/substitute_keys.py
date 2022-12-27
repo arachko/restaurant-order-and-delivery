@@ -13,9 +13,7 @@ from_db = {
     'items_': 'items',
     'comment_': 'comment',
     'partkey': None,
-    'sortkey': None,
-    'gsi_user_orders_partkey': None,
-    'gsi_user_orders_sortkey': None
+    'sortkey': None
 }
 
 

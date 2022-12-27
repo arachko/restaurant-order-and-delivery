@@ -39,12 +39,12 @@ def role_authorizer(auth_request):
                     AuthRoute(path=f'/restaurants/{UUID_PATTERN}', methods=['GET']),
                     AuthRoute(path=f'/restaurants/{UUID_PATTERN}/delivery-price', methods=['POST']),
                     AuthRoute(path=f'/menu-items/{UUID_PATTERN}', methods=['GET']),
-                    AuthRoute(path=f'/carts', methods=['GET', 'DELETE', 'POST']),
-                    AuthRoute(path=f'/carts/{UUID_PATTERN}', methods=['DELETE']),
+                    AuthRoute(path=f'/carts/{UUID_PATTERN}', methods=['GET', 'POST', 'DELETE']),
+                    AuthRoute(path=f'/carts/{UUID_PATTERN}/{UUID_PATTERN}', methods=['DELETE']),
                     AuthRoute(path=f'/orders', methods=['GET', 'POST']),
                     AuthRoute(path=f'/orders/id/{UUID_PATTERN}/{ORDER_ID_PATTERN}', methods=['GET', 'DELETE']),
                     AuthRoute(path=f'/orders/archived/*', methods=['GET']),
-                    AuthRoute(path=f'/orders/pre-order', methods=['POST'])
+                    AuthRoute(path=f'/orders/pre-order/{UUID_PATTERN}', methods=['POST'])
                 ],
                 principal_id='user'
             )

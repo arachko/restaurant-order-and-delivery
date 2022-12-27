@@ -125,24 +125,24 @@ def delete_menu_item(restaurant_id, menu_item_id):
 
 
 # CART
-@app.route('/carts', methods=['GET'], authorizer=role_authorizer, cors=True)
-def get_cart():
-    return carts.Cart.init_endpoint(app.current_request).endpoint_get_cart()
+@app.route('/carts/{restaurant_id}', methods=['GET'], authorizer=role_authorizer, cors=True)
+def get_cart(restaurant_id):
+    return carts.Cart.init_endpoint(app.current_request, restaurant_id).endpoint_get_cart()
 
 
-@app.route('/carts', methods=['POST'], authorizer=role_authorizer, cors=True)
-def add_item_to_cart():
-    return carts.Cart.init_endpoint(app.current_request).endpoint_add_item_to_cart()
+@app.route('/carts/{restaurant_id}', methods=['POST'], authorizer=role_authorizer, cors=True)
+def add_item_to_cart(restaurant_id):
+    return carts.Cart.init_endpoint(app.current_request, restaurant_id).endpoint_add_item_to_cart()
 
 
-@app.route('/carts/{menu_item_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
-def remove_item_from_cart(menu_item_id):
-    return carts.Cart.init_endpoint(app.current_request).endpoint_remove_item_from_cart(menu_item_id)
+@app.route('/carts/{restaurant_id}/{menu_item_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
+def remove_item_from_cart(restaurant_id, menu_item_id):
+    return carts.Cart.init_endpoint(app.current_request, restaurant_id).endpoint_remove_item_from_cart(menu_item_id)
 
 
-@app.route('/carts', methods=['DELETE'], authorizer=role_authorizer, cors=True)
-def clear_cart():
-    return carts.Cart.init_endpoint(app.current_request).endpoint_clear_cart()
+@app.route('/carts/{restaurant_id}', methods=['DELETE'], authorizer=role_authorizer, cors=True)
+def clear_cart(restaurant_id):
+    return carts.Cart.init_endpoint(app.current_request, restaurant_id).endpoint_clear_cart()
 
 
 # ORDERS
@@ -223,13 +223,23 @@ def get_order_by_id_unauthorized(restaurant_id, order_id):
                         user_id=UNAUTHORIZED_USER, restaurant_id=restaurant_id).endpoint_get_by_id()
 
 
-@app.route('/orders/pre-order/unauthorized', methods=['POST'], cors=True)
-def create_pre_order_unauthorized():
+@app.route('/orders/pre-order/{restaurant_id}/unauthorized', methods=['POST'], cors=True)
+def create_pre_order_unauthorized(restaurant_id):
     """
     The endpoint is for creating pre-orders by unauthorized users
     Authorization is not needed
     """
-    return orders.PreOrder.init_request_create_pre_order_unauthorized_user(app.current_request).\
+    return orders.PreOrder.init_request_create_pre_order_unauthorized_user(app.current_request, restaurant_id).\
+        endpoint_create_pre_order()
+
+
+@app.route('/orders/pre-order/{restaurant_id}', methods=['POST'], authorizer=role_authorizer, cors=True)
+def create_pre_order_authorized(restaurant_id):
+    """
+    The endpoint is for creating pre-orders by authorized users
+    order details will be taken from user's cart
+    """
+    return orders.PreOrder.init_request_create_pre_order_authorized_user(app.current_request, restaurant_id).\
         endpoint_create_pre_order()
 
 
@@ -240,16 +250,6 @@ def create_order_unauthorized():
     Authorization is not needed
     """
     return orders.Order.init_request_create_order_unauthorized(app.current_request).endpoint_create_order()
-
-
-@app.route('/orders/pre-order', methods=['POST'], authorizer=role_authorizer, cors=True)
-def create_pre_order_authorized():
-    """
-    The endpoint is for creating pre-orders by authorized users
-    order details will be taken from user's cart
-    """
-    return orders.PreOrder.init_request_create_pre_order_authorized_user(app.current_request).\
-        endpoint_create_pre_order()
 
 
 @app.route('/orders', methods=['POST'], authorizer=role_authorizer, cors=True)

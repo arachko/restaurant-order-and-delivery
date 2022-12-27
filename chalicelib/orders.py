@@ -1,10 +1,11 @@
+import json
 import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Tuple, Any, List, Dict
 from uuid import uuid4
 
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 from chalice import Response
 
 from chalicelib.base_class_entity import EntityBase
@@ -23,6 +24,7 @@ from chalicelib.utils import auth as utils_auth, \
     notifications as utils_notifications, \
     exceptions, \
     email_templates
+from chalicelib.utils.exceptions import OrderNotFound
 from chalicelib.utils.logger import logger
 
 
@@ -76,7 +78,7 @@ class PreOrder(EntityBase):
         self.payment_method: str = kwargs.get('payment_method')
 
     @classmethod
-    def init_request_create_pre_order_unauthorized_user(cls, request):
+    def init_request_create_pre_order_unauthorized_user(cls, request, restaurant_id):
         logger.info("init_request_create_pre_order_unauthorized_user ::: started")
         company_id = utils_auth.get_company_id_by_request(request)
         request_body = utils_data.parse_raw_body(request)
@@ -85,7 +87,7 @@ class PreOrder(EntityBase):
             company_id=company_id,
             id_=str(uuid4()).split('-')[0],
             user_id=UNAUTHORIZED_USER,
-            restaurant_id=request_body['restaurant_id'],
+            restaurant_id=restaurant_id,
             delivery_address=request_body['delivery_address'],
             menu_items=request_body['menu_items'],
             user_phone_number=request_body['user_phone_number'],
@@ -97,19 +99,19 @@ class PreOrder(EntityBase):
 
     @classmethod
     @utils_auth.authenticate_class
-    def init_request_create_pre_order_authorized_user(cls, request):
+    def init_request_create_pre_order_authorized_user(cls, request, restaurant_id):
         logger.info("init_request_create_pre_order_authorized_user ::: started")
         auth_result = request.auth_result
         user_id = auth_result['user_id']
         company_id = auth_result['company_id']
-        cart: Cart = Cart.init_by_user_id(company_id, user_id)
         request_body = utils_data.parse_raw_body(request)
+        cart: Cart = Cart.init_by_user_id(company_id, user_id, restaurant_id)
         utils_data.substitute_keys(request_body, to_db)
         return cls(
             company_id=company_id,
             id_=str(uuid4()).split('-')[0],
             user_id=user_id,
-            restaurant_id=cart.restaurant_id,
+            restaurant_id=restaurant_id,
             menu_items=cart.menu_items,
             delivery_address=request_body['delivery_address'],
             user_phone_number=request_body['user_phone_number'],
@@ -201,12 +203,6 @@ class Order(EntityBase):
 
     pk_archived = keys_structure.orders_archived_pk
     sk_archived = keys_structure.orders_archived_sk
-
-    pk_gsi_user_orders = keys_structure.gsi_user_orders_pk
-    sk_gsi_user_orders = keys_structure.gsi_user_orders_sk
-
-    pk_gsi_by_user_archived = keys_structure.gsi_orders_archived_pk
-    sk_gsi_by_user_archived = keys_structure.gsi_orders_archived_sk
 
     required_immutable_fields_validation = {
         'id_': lambda x: isinstance(x, str),
@@ -306,13 +302,17 @@ class Order(EntityBase):
         self.fill_items_details()
         self._create_db_record()
         if self.user_id != UNAUTHORIZED_USER:
-            Cart.init_by_user_id(company_id=self.company_id, user_id=self.user_id).delete_db_record()
+            Cart.init_by_user_id(
+                company_id=self.company_id, user_id=self.user_id, restaurant_id=self.restaurant_id).delete_db_record()
         return Response(status_code=http200, body=self._to_ui())
 
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_get_by_id(self):
-        self.__init__(**self._get_db_item_by_user_gsi())
+        request_user_id = self.user_id
+        self.__init__(**self._get_db_item())
+        if self.user_id != request_user_id:
+            raise OrderNotFound('Requested order not found')
         self.fill_items_details()
         return Response(status_code=http200, body=self._to_ui())
 
@@ -323,25 +323,8 @@ class Order(EntityBase):
         self.__init__(company_id=self.company_id, pre_order=self.pre_order, **pre_order_dict)
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk.format(company_id=self.company_id, restaurant_id=self.restaurant_id), self.sk.format(user_id=self.user_id, order_id=self.id_)
-
-    def _get_pk_sk_user_gsi(self) -> Tuple[str, str]:
-        return self.pk_gsi_user_orders.format(company_id=self.company_id, user_id=self.user_id), \
-               self.sk_gsi_user_orders.format(restaurant_id=self.restaurant_id, order_id=self.id_)
-
-    def _get_db_item_by_user_gsi(self):
-        pk_gsi_user_orders, sk_gsi_user_orders = self._get_pk_sk_user_gsi()
-        orders = utils_db.query_items_paged(
-            key_condition_expression=(
-                    Key('gsi_user_orders_partkey').eq(pk_gsi_user_orders) &
-                    Key('gsi_user_orders_sortkey').eq(sk_gsi_user_orders)
-            ),
-            index_name='gsi_user_orders'
-        )
-        if not orders:
-            raise exceptions.OrderNotFound(f'Order with ID {self.id_} not found')
-        else:
-            return orders[0]
+        return self.pk.format(company_id=self.company_id), \
+            self.sk.format(restaurant_id=self.restaurant_id, order_id=self.id_)
 
     def _to_dict(self):
         return {
@@ -369,12 +352,9 @@ class Order(EntityBase):
 
     def _init_db_record(self):
         pk, sk = self._get_pk_sk()
-        pk_gsi_user_orders, sk_gsi_user_orders = self._get_pk_sk_user_gsi()
         self.db_record = {
             'partkey': pk,
             'sortkey': sk,
-            'gsi_user_orders_partkey': pk_gsi_user_orders,
-            'gsi_user_orders_sortkey': sk_gsi_user_orders,
             'record_type': self.record_type,
             'company_id': self.company_id,
             **self._to_dict()
@@ -417,42 +397,72 @@ class Order(EntityBase):
         return self._to_ui()
 
 
-def get_conditions_user(company_id, user_id):
-    return Key('gsi_user_orders_partkey').eq(Order.pk_gsi_user_orders.format(company_id=company_id, user_id=user_id)), \
-        'gsi_user_orders'
-
-
-def get_conditions_rest_manager(company_id, restaurant_id):
+def get_restaurant_db_orders_paginated(company_id, restaurant_id, limit, start_key):
+    if start_key:
+        start_key = {
+            'partkey': Order.pk.format(company_id=company_id),
+            'sortkey': Order.sk.format(restaurant_id=restaurant_id, order_id=start_key)
+        }
     if not restaurant_id:
         raise exceptions.MissingRestaurantId('restaurant_id must be provided in query parameters')
-    return Key('partkey').eq(Order.pk.format(company_id=company_id, restaurant_id=restaurant_id)), None
+    partkey = Order.pk.format(company_id=company_id)
+    return utils_db.query_items_paginated(
+        key_condition_expression=Key('partkey').eq(partkey) & Key('sortkey').begins_with(restaurant_id),
+        start_key=start_key,
+        limit=limit
+    )
 
 
-@utils_app.request_exception_handler
+def get_user_db_orders(company_id, restaurant_id, user_id):
+    if restaurant_id:
+        filter_expression = Attr('user_id').eq(user_id) & Attr('restaurant_id').eq(restaurant_id)
+    else:
+        filter_expression = Attr('user_id').eq(user_id)
+    return utils_db.query_items_paged(
+        key_condition_expression=Key('partkey').eq(Order.pk.format(company_id=company_id)),
+        filter_expression=filter_expression,
+        index_name='date_created-index'
+    )
+
+
 @utils_app.log_start_finish
 @utils_auth.authenticate
+@utils_app.request_exception_handler
 def endpoint_get_orders(request, entity_type=None, entity_id=None):
     auth_result = request.auth_result
     company_id, user_id, user_role = auth_result['company_id'], auth_result['user_id'], auth_result['role']
+    qp = request.query_params or {}
+    restaurant_id, start_key, limit = qp.get('restaurant_id'), qp.get('start_key'), qp.get('page_size')
+    new_last_key = None
     match user_role:
         case 'user':
-            key_condition_exp, index_name = get_conditions_user(company_id, user_id)
+            db_records = get_user_db_orders(company_id, restaurant_id, user_id)
         case 'restaurant_manager':
-            # Todo: check if the manager have permissions to the restaurant (by ID list in manager's record)
-            key_condition_exp, index_name = get_conditions_rest_manager(company_id, entity_id)
+            accessible_restaurants = auth_result['permissions']['restaurants'].keys()
+            if entity_id not in accessible_restaurants:
+                raise exceptions.AccessDenied("Access Denied error")
+            db_records, new_last_key = get_restaurant_db_orders_paginated(company_id, entity_id, limit, start_key)
         case 'admin':
             if entity_type == 'user':
-                key_condition_exp, index_name = get_conditions_user(company_id, entity_id)
+                db_records = get_user_db_orders(company_id, restaurant_id, entity_id)
             elif entity_type == 'restaurant':
-                key_condition_exp, index_name = get_conditions_rest_manager(company_id, entity_id)
+                db_records, new_last_key = get_restaurant_db_orders_paginated(company_id, entity_id, limit, start_key)
             else:
                 logger.exception(f'endpoint_get_orders ::: Wrong entity_type={entity_type} in case of admin user')
                 raise Exception('endpoint_get_orders ::: Wrong entity_type in case of admin user')
         case _:
             raise exceptions.AccessDenied(f"You don't have permissions to access this resource")
 
-    db_records = utils_db.query_items_paged(key_condition_expression=key_condition_exp, index_name=index_name)
-    return Response(status_code=http200, body=[Order(**record).to_ui() for record in db_records])
+    if new_last_key:
+        new_last_key = new_last_key['sortkey'].split('_')[-1]
+
+    return Response(
+        status_code=http200,
+        body={
+            "orders": [Order(**record).to_ui() for record in db_records],
+            "last_evaluated_key": new_last_key
+        }
+    )
 
 
 @utils_app.log_start_finish
@@ -466,7 +476,7 @@ def db_trigger_send_order_notification(record_old: dict, record_new: dict, event
             record_new.get('user_email'),
             os.environ.get("ALL_ORDERS_EMAIL")
         ]
-        subject = f'New order has been received, ' \
+        subject = f'New order has been created, ' \
                   f'order ID - {record_new.get("id_")}, ' \
                   f'address - {record_new.get("address")}'
         email_body = email_templates.get_new_order_notification_message(record_new)

@@ -24,7 +24,7 @@ class Cart(EntityBase):
         'delivery_address': lambda x: isinstance(x, str)
     }
 
-    def __init__(self, company_id, id_, request_body=None):
+    def __init__(self, company_id, id_, restaurant_id, request_body=None):
         EntityBase.__init__(self, company_id, id_)
 
         if request_body is None:
@@ -32,7 +32,7 @@ class Cart(EntityBase):
 
         self.request_body = request_body
         self.db_record: Dict = {}
-        self.restaurant_id: Any[str, None] = None
+        self.restaurant_id: str = restaurant_id
         self.delivery_address = request_body.get('address', None)
         self.menu_items: Dict = {}
         self.record_type: str = 'cart'
@@ -44,22 +44,23 @@ class Cart(EntityBase):
             self.delivery_address = self.db_record.get('delivery_address')
             self.menu_items = self.db_record.get('menu_items')
         except exceptions.RecordNotFound:
-            self._init_db_record()
+            self._create_db_record()
 
     @classmethod
-    def init_by_user_id(cls, company_id, user_id):
-        c = cls(company_id=company_id, id_=user_id)
+    def init_by_user_id(cls, company_id, user_id, restaurant_id):
+        c = cls(company_id=company_id, id_=user_id, restaurant_id=restaurant_id)
         c._fill_db_item()
         return c
 
     @classmethod
     @utils_auth.authenticate_class
-    def init_endpoint(cls, request):
+    def init_endpoint(cls, request, restaurant_id):
         logger.info("init_endpoint ::: started")
         auth_result = request.auth_result
         return cls(
             company_id=auth_result['company_id'],
             id_=request.auth_result.get('user_id'),
+            restaurant_id=restaurant_id,
             request_body=utils_data.parse_raw_body(request)
         )
 
@@ -74,12 +75,7 @@ class Cart(EntityBase):
     def endpoint_add_item_to_cart(self):
         self._fill_db_item()
         qty = self.request_body.get('qty')
-        request_restaurant_id = self.request_body.get('restaurant_id')
         menu_item_id = self.request_body.get('menu_item_id')
-        if request_restaurant_id != self.restaurant_id:
-            self.restaurant_id = request_restaurant_id
-            self._create_db_record()
-            self.menu_items = {}
         self.menu_items[menu_item_id] = {'id': menu_item_id, 'qty': qty}
         all_items_available: bool = self._check_and_update_available_items()
         self._update_db_record()
@@ -103,7 +99,8 @@ class Cart(EntityBase):
         return Response(status_code=http200, body={'message': 'Cart was successfully cleared'})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
-        return self.pk.format(company_id=self.company_id), self.sk.format(user_id=self.id_)
+        return self.pk.format(company_id=self.company_id, restaurant_id=self.restaurant_id), \
+            self.sk.format(user_id=self.id_)
 
     def _to_dict(self):
         return {

@@ -151,10 +151,16 @@ def get_db_item(partkey, sortkey, table=get_gen_table):
         raise exceptions.RecordNotFound(f'record partkey={partkey} sortkey={sortkey} not found')
 
 
-def query_items_paged(key_condition_expression, filter_expression=None, projection_expression=None,
-                      table=get_gen_table, index_name=None, expr_attr_names=None):
-    """ This method shall be used whenever you think the query will
-        return more than 1mb of data at once"""
+def query_items_paginated(
+        key_condition_expression,
+        filter_expression=None,
+        projection_expression=None,
+        table=get_gen_table,
+        index_name=None,
+        expr_attr_names=None,
+        limit=None,
+        start_key=None
+):
     kwargs = {'KeyConditionExpression': key_condition_expression}
     if filter_expression:
         kwargs.update({'FilterExpression': filter_expression})
@@ -165,15 +171,44 @@ def query_items_paged(key_condition_expression, filter_expression=None, projecti
     if expr_attr_names:
         kwargs.update({'ExpressionAttributeNames': expr_attr_names})
 
+    if limit:
+        kwargs.update({'Limit': int(limit)})
+
     if index_name:
         kwargs.update({'IndexName': index_name})
 
+    if start_key:
+        kwargs.update({'ExclusiveStartKey': start_key})
+
     resp = table().query(**kwargs)
-    data = resp['Items']
+    return resp['Items'], resp.get('LastEvaluatedKey')
 
-    while 'LastEvaluatedKey' in resp:
-        kwargs.update({'ExclusiveStartKey': resp['LastEvaluatedKey']})
-        resp = table().query(**kwargs)
-        data.extend(resp['Items'])
 
-    return data
+def query_items_paged(key_condition_expression, filter_expression=None, projection_expression=None,
+                      table=get_gen_table, index_name=None, expr_attr_names=None):
+    """ This method shall be used whenever you think the query will
+        return more than 1mb of data at once"""
+    all_items = []
+    items, last_evaluated_key = query_items_paginated(
+        key_condition_expression,
+        filter_expression=filter_expression,
+        projection_expression=projection_expression,
+        table=table,
+        index_name=index_name,
+        expr_attr_names=expr_attr_names
+    )
+    all_items.extend(items)
+
+    while last_evaluated_key is not None:
+        items, last_evaluated_key = query_items_paginated(
+            key_condition_expression,
+            filter_expression=filter_expression,
+            projection_expression=projection_expression,
+            table=table,
+            index_name=index_name,
+            expr_attr_names=expr_attr_names,
+            start_key=last_evaluated_key
+        )
+        all_items.extend(items)
+
+    return all_items

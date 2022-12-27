@@ -13,7 +13,8 @@
         "MAX_IMG_WIDTH": "900",
         "MAX_THUMBNAIL_WIDTH": "200",
         "CUSTOMERS_TABLE_STREAM_ARN": "test_stream_arn",
-        "ALL_ORDERS_EMAIL": "rachko.a@gmail.com"
+        "ALL_ORDERS_EMAIL": "rachko.a@gmail.com",
+        "DEFAULT_PAGE_SIZE": "30"
       }
     },
     "dev": {
@@ -25,7 +26,8 @@
         "MAX_IMG_WIDTH": "900",
         "MAX_THUMBNAIL_WIDTH": "200",
         "CUSTOMERS_TABLE_STREAM_ARN": "test_stream_arn",
-        "ALL_ORDERS_EMAIL": "rachko.a@gmail.com"
+        "ALL_ORDERS_EMAIL": "rachko.a@gmail.com",
+        "DEFAULT_PAGE_SIZE": "30"
       }
     }
   }

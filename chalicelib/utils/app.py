@@ -3,7 +3,7 @@ from typing import Callable
 
 from chalice import Response
 
-from chalicelib.utils.exceptions import MandatoryFieldsAreNotFilled, OrderNotFound
+from chalicelib.utils.exceptions import MandatoryFieldsAreNotFilled, OrderNotFound, AccessDenied
 from chalicelib.utils.logger import logger, log_exception
 
 
@@ -38,6 +38,11 @@ def request_exception_handler(func: Callable):
                 error=order_not_found,
                 msg=f'function = {func.__name__} , error = {order_not_found}',
                 status_code=400)
+        except AccessDenied as access_denied:
+            return error_response(
+                error=access_denied,
+                msg="You don't have permissions to access this restaurant",
+                status_code=401)
         except Exception as exception:
             return error_response(
                 error=exception,
