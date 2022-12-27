@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "app_name": "restaurant-order-and-delivery",
+  "app_name": "restmonster-backend",
   "stages": {
     "localdev": {
       "autogen_policy": false,
