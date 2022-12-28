@@ -13,6 +13,7 @@ from chalicelib.utils.app import error_response
 from chalicelib.utils.logger import log_request, logger, log_exception
 
 host_company_id_map = {
+    'b10phnjz64.execute-api.eu-central-1.amazonaws.com': 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a',
     'test-domain.com': 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a',
     '127.0.0.1:8000': 'f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a'
 }
