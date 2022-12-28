@@ -3,7 +3,7 @@
   "app_name": "restmonster-backend",
   "stages": {
     "localdev": {
-      "autogen_policy": false,
+      "autogen_policy": true,
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
@@ -19,6 +19,7 @@
       }
     },
     "dev": {
+      "autogen_policy": true,
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",

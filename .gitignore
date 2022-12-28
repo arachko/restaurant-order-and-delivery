@@ -1,2 +1,4 @@
 .chalice/deployments/
 .chalice/venv/
+.chalice/venv37/
+.chalice/venv311/
