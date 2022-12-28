@@ -8,7 +8,7 @@
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
         "ENDPOINT_URL": "http://localhost:9000",
-        "GEN_TABLE_NAME": "local",
+        "MAIN_TABLE_NAME": "local",
         "CUSTOMERS_TABLE_NAME": "local",
         "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
         "MAX_IMG_WIDTH": "900",
@@ -23,7 +23,7 @@
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
-        "GEN_TABLE_NAME": "restmonster-main-dev",
+        "MAIN_TABLE_NAME": "restmonster-main-dev",
         "CUSTOMERS_TABLE_NAME": "restmonster-customers-dev",
         "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",
         "MAX_IMG_WIDTH": "900",

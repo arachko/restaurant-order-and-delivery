@@ -22,7 +22,7 @@ def create_company_and_admin(request):
     db.put_db_record(admin_record)
 
     def resource_teardown_admin_record():
-        db.get_gen_table().delete_item(Key={'partkey': admin_record['partkey'], 'sortkey': admin_record['sortkey']})
+        db.get_customers_table().delete_item(Key={'partkey': admin_record['partkey'], 'sortkey': admin_record['sortkey']})
     request.addfinalizer(resource_teardown_admin_record)
 
     return admin_record['id_']
@@ -71,7 +71,7 @@ def create_restaurant(chalice_gateway, request, id_admin, seq_number: int):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -86,7 +86,7 @@ def create_restaurant_manager(request, restaurant_ids: list):
     db.put_db_record(rest_manager_record)
 
     def resource_teardown_admin_record():
-        db.get_gen_table().delete_item(Key={'partkey': rest_manager_record['partkey'],
+        db.get_customers_table().delete_item(Key={'partkey': rest_manager_record['partkey'],
                                             'sortkey': rest_manager_record['sortkey']})
 
     request.addfinalizer(resource_teardown_admin_record)
@@ -100,7 +100,7 @@ def create_user(request):
     db.put_db_record(user_record)
 
     def resource_teardown_admin_record():
-        db.get_gen_table().delete_item(Key={'partkey': user_record['partkey'], 'sortkey': user_record['sortkey']})
+        db.get_customers_table().delete_item(Key={'partkey': user_record['partkey'], 'sortkey': user_record['sortkey']})
 
     request.addfinalizer(resource_teardown_admin_record)
 
@@ -155,7 +155,7 @@ def create_menu_item(chalice_gateway, request, restaurant_id, id_restaurant_mana
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_menu_item():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
@@ -176,7 +176,7 @@ def add_item_to_cart(chalice_gateway, request, id_user, restaurant_id, menu_item
         assert response['statusCode'] == 200
 
     def resource_teardown_cart():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.carts_pk.format(company_id=company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.carts_sk.format(user_id=id_user)
         })
@@ -209,7 +209,7 @@ def create_pre_order_authorized_user(chalice_gateway, request, id_user, restaura
     id_ = json.loads(response["body"])['id']
 
     def resource_teardown_pre_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.pre_orders_pk.format(company_id=company_id, user_id=id_user),
             'sortkey': keys_structure.pre_orders_sk.format(order_id=id_)
         })
@@ -226,7 +226,7 @@ def create_order_authorized_user(chalice_gateway, request, pre_order_id, id_user
     id_ = json.loads(response["body"])['id']
 
     def resource_teardown_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.orders_pk.format(company_id=company_id),
             'sortkey': keys_structure.orders_sk.format(restaurant_id=restaurant_id, order_id=id_)
         })

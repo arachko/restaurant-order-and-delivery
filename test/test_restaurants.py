@@ -42,7 +42,7 @@ def create_test_restaurant(chalice_gateway, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -77,12 +77,12 @@ def test_create_restaurant(chalice_gateway, request):
     sk = keys_structure.restaurants_sk.format(restaurant_id=response_body["id"])
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
+        db.get_customers_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
     request.addfinalizer(resource_teardown)
 
     assert response['statusCode'] == http200, f"status code not as expected"
     assert 'id' in response_body
-    db_record = db.get_gen_table().get_item(Key={'partkey': pk, 'sortkey': sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': pk, 'sortkey': sk})['Item']
     db_record['settings']['category_sequence'] = {
         int(key): value for key, value in db_record.get('settings', {}).get('category_sequence', {}).items()
     }
@@ -143,7 +143,7 @@ def test_update_restaurant(chalice_gateway, request):
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
-    db_record = db.get_gen_table().get_item(Key={
+    db_record = db.get_customers_table().get_item(Key={
         'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
         'sortkey': keys_structure.restaurants_sk.format(restaurant_id=restaurant_id)
     })['Item']
@@ -166,7 +166,7 @@ def test_archive_restaurant(chalice_gateway, request):
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
-    db_record = db.get_gen_table().get_item(Key={
+    db_record = db.get_customers_table().get_item(Key={
         'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
         'sortkey': keys_structure.restaurants_sk.format(restaurant_id=restaurant_id)
     })['Item']

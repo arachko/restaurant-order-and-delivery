@@ -36,7 +36,7 @@ def create_test_restaurant(chalice_gateway, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_restaurant():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -58,7 +58,7 @@ def create_test_menu_item(chalice_gateway, restaurant_id, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_menu_item():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
@@ -87,13 +87,13 @@ def test_create_menu_item(chalice_gateway, request):
     assert 'id' in response_body
 
     def resource_teardown_menu_item():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=response_body['id'])
         })
     request.addfinalizer(resource_teardown_menu_item)
 
-    db_record = db.get_gen_table().get_item(Key={
+    db_record = db.get_customers_table().get_item(Key={
         'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
         'sortkey': keys_structure.menu_items_sk.format(menu_item_id=response_body['id'])
     })['Item']
@@ -139,7 +139,7 @@ def test_update_menu_item(chalice_gateway, request):
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
-    db_record = db.get_gen_table().get_item(Key={
+    db_record = db.get_customers_table().get_item(Key={
         'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
         'sortkey': keys_structure.menu_items_sk.format(menu_item_id=menu_item_id)
     })['Item']
@@ -163,7 +163,7 @@ def test_archive_menu_item(chalice_gateway, request):
 
     assert response['statusCode'] == http200, f"status code not as expected"
 
-    db_record = db.get_gen_table().get_item(Key={
+    db_record = db.get_customers_table().get_item(Key={
         'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
         'sortkey': keys_structure.menu_items_sk.format(menu_item_id=menu_item_id)
     })['Item']

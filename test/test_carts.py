@@ -36,7 +36,7 @@ def create_test_restaurant(chalice_gateway, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -58,7 +58,7 @@ def create_test_menu_item(chalice_gateway, restaurant_id, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
@@ -83,7 +83,7 @@ def add_test_item_to_cart(chalice_gateway, restaurant_id, menu_item_id, request)
         keys_structure.carts_sk.format(user_id=id_user)
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
+        db.get_customers_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
     request.addfinalizer(resource_teardown)
 
 
@@ -120,7 +120,7 @@ def test_add_item_to_cart(chalice_gateway, request):
     assert response['statusCode'] == http200, f"status code not as expected"
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
+        db.get_customers_table().delete_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
     request.addfinalizer(resource_teardown)
 
     def assert_cart_details(assert_dict, from_db=False):
@@ -134,7 +134,7 @@ def test_add_item_to_cart(chalice_gateway, request):
     cart = json.loads(response["body"]).get('cart')
     assert_cart_details(cart)
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record, from_db=True)
 
     response_get = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}", method="GET", token=id_user)
@@ -161,7 +161,7 @@ def test_remove_item_from_cart(chalice_gateway, request):
             assert 'partkey' not in assert_dict
             assert 'sortkey' not in assert_dict
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record, from_db=True)
 
     response_get = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}/{menu_item_id}",
@@ -169,7 +169,7 @@ def test_remove_item_from_cart(chalice_gateway, request):
     cart = json.loads(response_get["body"]).get('cart')
     assert_cart_details(cart, menu_items={})
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record, from_db=True, menu_items={})
 
 
@@ -187,11 +187,11 @@ def test_clear_cart(chalice_gateway, request):
         assert assert_dict['restaurant_id'] == restaurant_id
         assert assert_dict['menu_items'] == {menu_item_id: {'id': menu_item_id, 'qty': Decimal('3')}}
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})['Item']
     assert_cart_details(db_record)
 
     response_get = make_request(chalice_gateway, endpoint=f"/carts/{restaurant_id}", method="DELETE", token=id_user)
     assert json.loads(response_get["body"]).get('message') == 'Cart was successfully cleared'
 
-    get_db_record_response = db.get_gen_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
+    get_db_record_response = db.get_customers_table().get_item(Key={'partkey': carts_pk, 'sortkey': carts_sk})
     assert 'Item' not in get_db_record_response

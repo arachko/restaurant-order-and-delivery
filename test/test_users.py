@@ -32,7 +32,7 @@ def create_test_user(request):
     db.put_db_record(user_db_record)
 
     def resource_teardown_rest():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.users_pk,
             'sortkey': keys_structure.users_sk.format(user_id=id_)
         })

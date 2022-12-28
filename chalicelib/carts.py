@@ -118,5 +118,5 @@ class Cart(EntityBase):
 
     def delete_db_record(self):
         pk, sk = self._get_pk_sk()
-        utils_db.get_gen_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
+        utils_db.get_customers_table().delete_item(Key={'partkey': pk, 'sortkey': sk})
         logger.info(f"delete_db_record ::: item list in the cart was successfully updated")

@@ -9,7 +9,7 @@ from chalicelib.constants.constants import UNAUTHORIZED_USER
 from chalicelib.constants.status_codes import http200
 from chalicelib.utils import db
 from chalicelib.utils.auth import host_company_id_map
-from chalicelib.utils.db import get_gen_table
+from chalicelib.utils.db import get_customers_table
 from test.utils.request_utils import make_request
 
 from test.utils.fixtures import chalice_gateway
@@ -40,7 +40,7 @@ def create_test_restaurant(chalice_gateway, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_rest():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -72,11 +72,11 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
     id_2 = json.loads(response_2["body"])["id"]
 
     def resource_teardown_menu_items():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_2)
         })
@@ -96,7 +96,7 @@ def add_test_items_to_cart(chalice_gateway, restaurant_id, menu_items: List[List
         assert response['statusCode'] == 200
 
     def resource_teardown_cart():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.carts_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.carts_sk.format(user_id=id_user)
         })
@@ -125,7 +125,7 @@ def create_test_pre_order_unauthorized_user(chalice_gateway, restaurant_id, menu
     id_ = response_body['id']
 
     def resource_teardown_pre_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.pre_orders_pk.format(company_id=test_company_id, user_id=UNAUTHORIZED_USER),
             'sortkey': keys_structure.pre_orders_sk.format(order_id=id_)
         })
@@ -141,7 +141,7 @@ def create_test_order_unauthorized_user(chalice_gateway, pre_order_id, restauran
     id_ = json.loads(response["body"])['id']
 
     def resource_teardown_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.orders_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.orders_sk.format(restaurant_id=restaurant_id, order_id=id_)
         })
@@ -167,7 +167,7 @@ def create_test_pre_order_authorized_user(chalice_gateway, request, restaurant_i
     id_ = json.loads(response["body"])['id']
 
     def resource_teardown_pre_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.pre_orders_pk.format(company_id=test_company_id, user_id=id_user),
             'sortkey': keys_structure.pre_orders_sk.format(order_id=id_)
         })
@@ -183,7 +183,7 @@ def create_test_order_authorized_user(chalice_gateway, pre_order_id, restaurant_
     id_ = json.loads(response["body"])['id']
 
     def resource_teardown_order():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.orders_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.orders_sk.format(restaurant_id=restaurant_id, order_id=id_)
         })
@@ -221,7 +221,7 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
     pre_order_sk = keys_structure.pre_orders_sk.format(order_id=order_id)
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})
+        db.get_customers_table().delete_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})
     request.addfinalizer(resource_teardown)
 
     assert response['statusCode'] == http200, f"status code not as expected"
@@ -236,7 +236,7 @@ def test_create_pre_order_unauthorized_user(chalice_gateway, request):
     assert response_body['archived'] is False
     assert response_body['comment'] == 'Please deliver my order ASAP'
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})['Item']
 
     assert db_record['archived'] is False
 
@@ -258,7 +258,7 @@ def test_create_order_unauthorized_user(chalice_gateway, request):
     order_sk = keys_structure.orders_sk.format(restaurant_id=restaurant_id, order_id=order_id)
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': order_pk, 'sortkey': order_sk})
+        db.get_customers_table().delete_item(Key={'partkey': order_pk, 'sortkey': order_sk})
     request.addfinalizer(resource_teardown)
 
     assert response['statusCode'] == http200, f"status code not as expected"
@@ -276,7 +276,7 @@ def test_create_order_unauthorized_user(chalice_gateway, request):
     assert response_body['comment'] == 'Please deliver my order ASAP'
     assert response_body['feedback'] is None
 
-    db_record = db.get_gen_table().get_item(Key={'partkey': order_pk, 'sortkey': order_sk})['Item']
+    db_record = db.get_customers_table().get_item(Key={'partkey': order_pk, 'sortkey': order_sk})['Item']
 
     assert db_record['archived'] is False
 
@@ -336,7 +336,7 @@ def test_create_pre_order_authorized_user(chalice_gateway, request):
     pre_order_sk = keys_structure.pre_orders_sk.format(order_id=pre_order_id)
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})
+        db.get_customers_table().delete_item(Key={'partkey': pre_order_pk, 'sortkey': pre_order_sk})
     request.addfinalizer(resource_teardown)
 
     assert response_body['user_id'] == id_user
@@ -366,7 +366,7 @@ def test_create_order_authorized_user(chalice_gateway, request):
     order_sk = keys_structure.orders_sk.format(restaurant_id=restaurant_id, order_id=order_id)
 
     def resource_teardown():
-        db.get_gen_table().delete_item(Key={'partkey': order_pk, 'sortkey': order_sk})
+        db.get_customers_table().delete_item(Key={'partkey': order_pk, 'sortkey': order_sk})
     request.addfinalizer(resource_teardown)
 
     assert response_body['id'] == pre_order_id
@@ -451,7 +451,7 @@ def test_admin_get_user_orders(chalice_gateway, request):
 @pytest.mark.local_db_test
 def test_rest_manager_get_restaurant_orders(chalice_gateway, request):
     restaurant_id = create_test_restaurant(chalice_gateway, request)
-    get_gen_table().update_item(
+    get_customers_table().update_item(
         Key={'partkey': "users_f770d5f7-6dd2-4cdf-842b-5fd0dd84a52a", 'sortkey': '8178f948-cdc2-4e8c-b013-07a956e7e72a'},
         UpdateExpression="set permissions_.restaurants=:r",
         ExpressionAttributeValues={':r': {restaurant_id: 'all'}}

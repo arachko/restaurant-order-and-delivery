@@ -66,16 +66,20 @@ def get_table(gl_table: boto3.session.Session.resource, table_name: str) -> boto
     return gl_table
 
 
-def get_gen_table():
-    return get_table(_DB, os.environ.get('GEN_TABLE_NAME'))
+def get_customers_table():
+    return get_table(_DB, os.environ.get('CUSTOMERS_TABLE_NAME'))
 
 
-def put_db_record(item: dict, table=get_gen_table):
+def get_main_table():
+    return get_table(_DB, os.environ.get('MAIN_TABLE_NAME'))
+
+
+def put_db_record(item: dict, table=get_customers_table):
     table().put_item(Item=item)
 
 
 def update_db_record(key: dict, update_body: dict, allowed_attrs_to_update: list,
-                     allowed_attrs_to_delete: list, table=get_gen_table):
+                     allowed_attrs_to_delete: list, table=get_customers_table):
     data.substitute_keys(dict_to_process=update_body, base_keys=substitute_keys.to_db)
     set_expr, expr_attr_values, remove_expr = generate_update_expression(
         update_body=update_body,
@@ -136,7 +140,7 @@ def generate_update_expression(update_body: dict, allowed_attrs_to_update: list,
     return return_value
 
 
-def get_db_item(partkey, sortkey, table=get_gen_table):
+def get_db_item(partkey, sortkey, table=get_customers_table):
     result = table().get_item(
         Key={
             'partkey': partkey,
@@ -155,7 +159,7 @@ def query_items_paginated(
         key_condition_expression,
         filter_expression=None,
         projection_expression=None,
-        table=get_gen_table,
+        table=get_customers_table,
         index_name=None,
         expr_attr_names=None,
         limit=None,
@@ -185,7 +189,7 @@ def query_items_paginated(
 
 
 def query_items_paged(key_condition_expression, filter_expression=None, projection_expression=None,
-                      table=get_gen_table, index_name=None, expr_attr_names=None):
+                      table=get_customers_table, index_name=None, expr_attr_names=None):
     """ This method shall be used whenever you think the query will
         return more than 1mb of data at once"""
     all_items = []

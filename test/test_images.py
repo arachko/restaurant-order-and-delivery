@@ -36,7 +36,7 @@ def create_test_restaurant(chalice_gateway, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_rest():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.restaurants_pk.format(company_id=test_company_id),
             'sortkey': keys_structure.restaurants_sk.format(restaurant_id=id_)
         })
@@ -58,7 +58,7 @@ def create_test_menu_items(chalice_gateway, restaurant_id, request):
     id_ = json.loads(response["body"])["id"]
 
     def resource_teardown_menu_items():
-        db.get_gen_table().delete_item(Key={
+        db.get_customers_table().delete_item(Key={
             'partkey': keys_structure.menu_items_pk.format(company_id=test_company_id, restaurant_id=restaurant_id),
             'sortkey': keys_structure.menu_items_sk.format(menu_item_id=id_)
         })
