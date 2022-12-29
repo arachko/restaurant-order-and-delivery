@@ -26,8 +26,8 @@ def role_authorizer(auth_request):
 
 
 @app.on_dynamodb_record(stream_arn=get_customers_table_stream_arn())
-def db_customers_table_stream_trigger(event, context):
-    return triggers.db_customers_table_stream_trigger(event, context)
+def db_customers_table_stream_trigger(event):
+    return triggers.db_customers_table_stream_trigger(event)
 
 
 # USERS

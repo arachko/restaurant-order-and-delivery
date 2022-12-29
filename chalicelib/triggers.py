@@ -15,7 +15,7 @@ def deserialize_ddb_rec(record):
     return {key: deserializer.deserialize(value) for key, value in record.items()}
 
 
-def db_customers_table_stream_trigger(event: dict, context: dict):
+def db_customers_table_stream_trigger(event: dict):
     logger.debug(f'db_customers_table_stream_trigger ::: function triggered {event=}')
     for record in event.get('Records', []):
         try:
