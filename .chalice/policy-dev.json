@@ -59,7 +59,7 @@
         "cognito-idp:*"
       ],
       "Resource": [
-        "arn:aws:cognito-idp:eu-central-1:095152302743:userpool/eu-central-1_EnZPu9iZp"
+        "arn:aws:cognito-idp:eu-central-1:396199942073:userpool/eu-central-1_sS5JMFJOf"
       ]
     },
     {
