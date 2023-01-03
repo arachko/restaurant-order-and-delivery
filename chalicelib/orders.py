@@ -465,9 +465,10 @@ def endpoint_get_orders(request, entity_type=None, entity_id=None):
 
 
 @utils_app.log_start_finish
-def db_trigger_send_order_notification(record_old: dict, record_new: dict, event_id: str, event_name: str):
-    logger.info(f'db_trigger_send_order_notification ::: order_record={record_new}, {event_id=}, {event_name=}')
+def db_trigger_order_record(record_old: dict, record_new: dict, event_id: str, event_name: str):
+    logger.info(f'db_trigger_order_record ::: {record_new=}, {record_old=}, {event_id=}, {event_name=}')
     if event_name.lower() == 'insert':
+        logger.info(f'db_trigger_order_record ::: insert')
         company_id = record_new.get('company_id')
         settings_record: Dict = get_company_settings_record(company_id)
         order_notification_emails: List = [
@@ -480,3 +481,5 @@ def db_trigger_send_order_notification(record_old: dict, record_new: dict, event
                   f'address - {record_new.get("address")}'
         email_body = email_templates.get_new_order_notification_message(record_new)
         utils_notifications.send_email_ses(order_notification_emails, ORDER_EMAIL_FROM, subject, email_body)
+    elif event_name.lower() == 'remove':
+        logger.info(f'db_trigger_order_record ::: remove')

@@ -20,6 +20,8 @@ def get_customers_table_stream_arn():
     return os.environ.get("CUSTOMERS_TABLE_STREAM_ARN")
 
 
+# cognito lambdas
+# OAuth login/logout callbacks
 @app.authorizer()
 def role_authorizer(auth_request):
     return auth.role_authorizer(auth_request)
@@ -30,15 +32,77 @@ def db_customers_table_stream_trigger(event):
     return triggers.db_customers_table_stream_trigger(event)
 
 
+@app.lambda_function(name='restmonster_CognitoPreSignup')
+def cognito_pre_signup(event, context):
+    return auth.cognito_pre_signup(event, context)
+
+
+@app.lambda_function(name='restmonster_CognitoPostConfirmation')
+def cognito_post_confirmation(event, context):
+    return auth.cognito_post_confirmation(event, context)
+
+
+@app.lambda_function(name='restmonster_CognitoCustomMessage')
+def cognito_custom_message(event, context):
+    return auth.cognito_custom_message(event, context)
+
+
+@app.route('/login-cognito', methods=['POST'], cors=True)
+def login_cognito():
+    return auth.login_cognito(app.current_request)
+
+
+@app.route('/refresh-token-cognito', methods=['POST'], cors=True)
+def refresh_token_cognito():
+    return auth.refresh_id_token_cognito(app.current_request)
+
+
+@app.route("/signup-confirm/{client_id}/{user_name}/{confirmation_code}", methods=['GET'])
+def signup_confirm(client_id, user_name, confirmation_code):
+    return auth.signup_confirmation(client_id, user_name, confirmation_code)
+
+
 # USERS
 @app.route('/users', methods=['GET'], authorizer=role_authorizer, cors=True)
 def get_user():
-    return users.User.init_request_get(app.current_request).endpoint_get_user()
+    return users.User.init_request_user(app.current_request).endpoint_get_user()
 
 
 @app.route('/users', methods=['PUT'], authorizer=role_authorizer, cors=True)
 def update_user():
     return users.User.init_request_update(app.current_request).endpoint_update_user()
+
+
+# Todo: ADD TEST
+@app.route('/users/managers', methods=['GET'], authorizer=role_authorizer, cors=True)
+def get_managers():
+    """
+    admin operation
+    :return:
+    {"managers": list_of_managers}
+    """
+    return users.User.endpoint_get_managers(app.current_request)
+
+
+# Todo: ADD TEST
+@app.route('/users/managers', methods=['POST'], authorizer=role_authorizer, cors=True)
+def create_manager():
+    """
+    admin operation
+    :return:
+    {"user_id": new_manager_id}
+    """
+    return users.User.init_request_create_manager(app.current_request).endpoint_create_manager()
+
+
+# Todo: ADD TEST
+@app.route('/users/managers', methods=['DELETE'], authorizer=role_authorizer, cors=True)
+def create_manager():
+    """
+    admin operation
+    :return:
+    """
+    return users.User.init_request_user(app.current_request).endpoint_delete_manager()
 
 
 # RESTAURANTS

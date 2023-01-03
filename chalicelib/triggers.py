@@ -1,18 +1,20 @@
 from boto3.dynamodb.types import TypeDeserializer
 from chalice.app import DynamoDBEvent
 
-from chalicelib.orders import db_trigger_send_order_notification
+from chalicelib.orders import db_trigger_order_record
 from chalicelib.utils.logger import logger, log_exception
 
 
 deserializer = TypeDeserializer()
 
 customers_table_trigger_func_dict = {
-    'order': db_trigger_send_order_notification
+    'order': db_trigger_order_record
 }
 
 
-def deserialize_ddb_rec(record):
+def deserialize_ddb_rec(record=None):
+    if record is None:
+        record = {}
     return {key: deserializer.deserialize(value) for key, value in record.items()}
 
 

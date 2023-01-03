@@ -78,6 +78,10 @@ def put_db_record(item: dict, table=get_customers_table):
     table().put_item(Item=item)
 
 
+def delete_db_record(key: dict, table=get_customers_table):
+    table().delete_item(Key=key)
+
+
 def update_db_record(key: dict, update_body: dict, allowed_attrs_to_update: list,
                      allowed_attrs_to_delete: list, table=get_customers_table):
     data.substitute_keys(dict_to_process=update_body, base_keys=substitute_keys.to_db)

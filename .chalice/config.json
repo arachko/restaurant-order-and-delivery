@@ -7,6 +7,8 @@
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
+        "COGNITO_ADMIN_POOL_ID": "eu-central-1_sS5JMFJOf",
+        "COGNITO_ADMIN_POOL_CLIENT_ID": "7lfrju09uejj10bavg6ab3ij9o",
         "ENDPOINT_URL": "http://localhost:9000",
         "MAIN_TABLE_NAME": "local",
         "CUSTOMERS_TABLE_NAME": "local",
@@ -23,6 +25,8 @@
       "api_gateway_stage": "api",
       "environment_variables": {
         "DEFAULT_REGION": "eu-central-1",
+        "COGNITO_ADMIN_POOL_ID": "eu-central-1_sS5JMFJOf",
+        "COGNITO_ADMIN_POOL_CLIENT_ID": "7lfrju09uejj10bavg6ab3ij9o",
         "MAIN_TABLE_NAME": "restmonster-main-dev",
         "CUSTOMERS_TABLE_NAME": "restmonster-customers-dev",
         "WEBSITES_FILES_BUCKET_NAME": "restmonster-websites-images-dev",

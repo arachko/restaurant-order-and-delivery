@@ -1,11 +1,16 @@
-from typing import Tuple
+import os
+import secrets
+import uuid
+from typing import Tuple, List, Dict
 
+from boto3.dynamodb.conditions import Key, Attr
 from chalice import Response
+from pycognito import Cognito
 
 from chalicelib.base_class_entity import EntityBase
 from chalicelib.constants import keys_structure
 from chalicelib.constants.status_codes import http200
-from chalicelib.utils import auth as utils_auth, app as utils_app, data as utils_data
+from chalicelib.utils import auth as utils_auth, app as utils_app, data as utils_data, db as utils_db
 from chalicelib.utils.logger import logger
 
 
@@ -58,7 +63,7 @@ class User(EntityBase):
 
     @classmethod
     @utils_auth.authenticate_class
-    def init_request_get(cls, request):
+    def init_request_user(cls, request):
         logger.info("init_request_get ::: started")
         auth_result = request.auth_result
         return cls.init_by_id(auth_result['company_id'], auth_result['user_id'])
@@ -71,6 +76,14 @@ class User(EntityBase):
         request_body = utils_data.parse_raw_body(request)
         return cls(company_id=auth_result['company_id'], id_=auth_result['user_id'], **request_body)
 
+    @classmethod
+    @utils_auth.authenticate_class
+    def init_request_create_manager(cls, request):
+        logger.info("init_request_create_manager ::: started")
+        auth_result = request.auth_result
+        request_body = utils_data.parse_raw_body(request)
+        return cls(company_id=auth_result['company_id'], id_=str(uuid.uuid4()), **request_body)
+
     @utils_app.request_exception_handler
     @utils_app.log_start_finish
     def endpoint_get_user(self) -> Response:
@@ -81,6 +94,40 @@ class User(EntityBase):
     def endpoint_update_user(self) -> Response:
         self._update_db_record()
         return Response(status_code=http200, body={'message': 'User was successfully updated', 'id': self.id_})
+
+    @utils_auth.authenticate
+    def endpoint_get_managers(self, request) -> Response:
+        logger.info("endpoint_get_list_of_managers ::: started")
+        manager_db_records: list = utils_db.query_items_paged(
+            Key('partkey').eq(self.pk.format(company_id=request.auth_result['company_id'])),
+            filter_expression=Attr('role').eq('restaurant_manager')
+        )
+        managers: List[Dict] = [User(**record)._to_ui() for record in manager_db_records]
+        return Response(status_code=http200, body={'managers': managers})
+
+    @utils_app.request_exception_handler
+    @utils_app.log_start_finish
+    def endpoint_create_manager(self) -> Response:
+        cognito = Cognito(os.environ['COGNITO_ADMIN_POOL_ID'], os.environ['COGNITO_ADMIN_POOL_CLIENT_ID'],
+                          user_pool_region=os.environ['DEFAULT_REGION'])
+        cognito_resp = cognito.admin_create_user(
+            self.email,
+            temporary_password=secrets.token_urlsafe(8),
+            attr_map={'custom:role': 'role', 'custom:company_id': 'company_id'},
+            role='restaurant_manager',
+            company_id=self.company_id
+        )
+        return Response(status_code=http200, body={'user_id': cognito_resp['User']['Username']})
+
+    @utils_app.request_exception_handler
+    @utils_app.log_start_finish
+    def endpoint_delete_manager(self) -> Response:
+        cognito = Cognito(os.environ['COGNITO_ADMIN_POOL_ID'], os.environ['COGNITO_ADMIN_POOL_CLIENT_ID'],
+                          user_pool_region=os.environ['DEFAULT_REGION'], username=self.email)
+        cognito.admin_delete_user()
+        partkey, sortkey = self._get_pk_sk()
+        utils_db.delete_db_record({"partkey": partkey, "sortkey": sortkey})
+        return Response(status_code=http200, body={'message': 'user was deleted successfully'})
 
     def _get_pk_sk(self) -> Tuple[str, str]:
         return self.pk.format(company_id=self.company_id), self.sk.format(user_id=self.id_)
