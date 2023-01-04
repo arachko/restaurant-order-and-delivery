@@ -278,7 +278,7 @@ def cognito_custom_message(event, context):
             event['response']['emailSubject'] = "Your RestMonster verification link"
             event['response']['emailMessage'] = email_message.format(link=link)
             logger.debug(f'cognito_custom_message(): client_id={client_id}, user_attr={user_attr}, email = {email}, url={url}')
-            logger.debug(f'cognito_custom_message ::: email_message.format(link)={email_message.format(link)}')
+            logger.debug(f'cognito_custom_message ::: email_message.format(link)={email_message.format(link=link)}')
         else:
             logger.info(f'cognito_custom_message ::: unhandled event {event["triggerSource"]}')
 
